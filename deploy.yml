@@ -1,0 +1,55 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: URLs aus Secrets einsetzen
+        env:
+          CREDITS_URL: ${{ secrets.CREDITS_URL }}
+          STATS_URL:   ${{ secrets.STATS_URL }}
+          SHEETS_URL:  ${{ secrets.SHEETS_URL }}
+        run: |
+          set -euo pipefail
+          for f in index.html app.js; do
+            sed -i "s|__CREDITS_URL__|${CREDITS_URL}|g" "$f"
+            sed -i "s|__STATS_URL__|${STATS_URL}|g"     "$f"
+            sed -i "s|__SHEETS_URL__|${SHEETS_URL}|g"   "$f"
+          done
+          # Fehlt ein Secret, bliebe der Platzhalter stehen -> lieber abbrechen
+          # als eine kaputte Seite zu veroeffentlichen.
+          if grep -n "__CREDITS_URL__\|__STATS_URL__\|__SHEETS_URL__" index.html app.js; then
+            echo "::error::Mindestens ein Secret fehlt (CREDITS_URL / STATS_URL / SHEETS_URL)."
+            exit 1
+          fi
+
+      - name: Sicherungen nicht mit veroeffentlichen
+        run: rm -f *.backup-*.html landing.backup-*.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - uses: actions/deploy-pages@v4
+        id: deployment
