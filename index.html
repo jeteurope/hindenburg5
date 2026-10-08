@@ -1487,20 +1487,50 @@ window.HB = (function () {
     try { localStorage.setItem(PREFIX + key, JSON.stringify({ t: Date.now(), data: data })); } catch (e) {}
   }
 
-  function jsonp(url, ms) {
+  const listeners = {};     // key -> [fn]
+  /* Ansichten melden sich hier an und werden bei JEDEM neuen Datenstand
+     aufgerufen – auch wenn er erst spät oder über "Aktualisieren"
+     an anderer Stelle hereinkommt. */
+  function on(key, fn) { (listeners[key] = listeners[key] || []).push(fn); }
+  function emit(key, data) {
+    (listeners[key] || []).forEach(function (fn) { try { fn(data); } catch (e) { console.error(e); } });
+  }
+
+  /* Ein JSONP-Abruf. Bleibt bis hardMs empfangsbereit – eine späte Antwort
+     von Google wird also NICHT verworfen. */
+  function jsonp(url, hardMs) {
     return new Promise(function (resolve, reject) {
       const cb = '__hb_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
       const s  = document.createElement('script');
-      const timer = setTimeout(function () { done(); const e = new Error('Zeitüberschreitung'); e.retry = true; reject(e); }, ms);
+      const timer = setTimeout(function () { done(); reject(new Error('Zeitüberschreitung')); }, hardMs);
       function done() { clearTimeout(timer); window[cb] = function () {}; s.remove(); }
       window[cb] = function (data) {
         done();
         if (Array.isArray(data)) resolve(data);
         else reject(new Error('Sheet-Fehler: ' + ((data && data.error) || 'unerwartete Antwort')));
       };
-      s.onerror = function () { done(); const e = new Error('Keine Verbindung'); e.retry = true; reject(e); };
+      s.onerror = function () { done(); reject(new Error('Keine Verbindung')); };
       s.src = url + (url.indexOf('?') < 0 ? '?' : '&') + 'callback=' + cb;
       document.head.appendChild(s);
+    });
+  }
+
+  /* Erster Versuch; antwortet Google nach 20 s noch nicht, läuft parallel
+     ein zweiter – der erste bleibt dabei aktiv. Die erste gute Antwort gewinnt,
+     aufgegeben wird erst, wenn beide gescheitert sind (spätestens nach 90 s). */
+  function fetchRace(url) {
+    return new Promise(function (resolve, reject) {
+      let settled = false, failed = 0, started = 1, lastErr = null, second = null;
+      function ok(d)  { if (!settled) { settled = true; clearTimeout(second); resolve(d); } }
+      function bad(e) {
+        lastErr = e; failed++;
+        if (e.message.indexOf('Sheet-Fehler') === 0) { if (!settled) { settled = true; clearTimeout(second); reject(e); } return; }
+        if (started === 1 && !settled) { clearTimeout(second); start(); return; }   // sofort zweiter Versuch
+        if (failed >= started && !settled) { settled = true; reject(lastErr); }
+      }
+      function start() { started++; jsonp(url, 70000).then(ok, bad); }
+      jsonp(url, 90000).then(ok, bad);
+      second = setTimeout(function () { if (!settled && started === 1) start(); }, 20000);
     });
   }
 
@@ -1509,11 +1539,9 @@ window.HB = (function () {
     const L = live[key] || (live[key] = {});
     if (L.promise && !force) return L.promise;
     if (!url) return Promise.reject(new Error('Keine Sheet-URL hinterlegt'));
-    const p = jsonp(url, 20000).catch(function (e) {
-      if (e.retry) return jsonp(url, 30000);      // zweiter Versuch, etwas mehr Geduld
-      throw e;
-    }).then(function (d) {
+    const p = fetchRace(url).then(function (d) {
       L.data = d; L.t = Date.now(); writeStore(key, d);
+      emit(key, d);
       return d;
     });
     L.promise = p;
@@ -1543,7 +1571,7 @@ window.HB = (function () {
     }));
   }
 
-  return { get: get, cached: cached, stamp: stamp, script: script };
+  return { get: get, on: on, cached: cached, stamp: stamp, script: script };
 })();
 </script>
 <script>
@@ -2032,6 +2060,8 @@ window.HB = (function () {
     if (data.length) crBadges(staleT ? 'Stand ' + HB.stamp(staleT) : 'Live', !staleT);
   }
 
+  HB.on('credits', function (data) { applyCredits(data, null); });
+
   function loadCredits(force) {
     const btn = document.getElementById('crRefreshBtn');
     if (!CR_CONFIG.SHEET_URL) {
@@ -2049,9 +2079,7 @@ window.HB = (function () {
       crBadges('Lädt …', false);
     }
     btn.classList.add('spinning');
-    HB.get('credits', CR_CONFIG.SHEET_URL + '?action=credits', force === true).then(function (data) {
-      applyCredits(data, null);
-    }).catch(function (err) {
+    HB.get('credits', CR_CONFIG.SHEET_URL + '?action=credits', force === true).catch(function (err) {
       if (crRows) {
         /* Gespeicherter Stand bleibt sichtbar – nur ehrlich kennzeichnen. */
         const st = HB.cached('credits');
@@ -2100,6 +2128,8 @@ window.HB = (function () {
     badge.className = 'cr-source-badge' + (!staleT && data.length ? ' live' : '');
   }
 
+  HB.on('ehemalige', function (data) { applyEhemalige(data, null); });
+
   function loadEhemalige(force) {
     const btn = document.getElementById('ehRefreshBtn');
     if (!CR_CONFIG.SHEET_URL) {
@@ -2114,9 +2144,7 @@ window.HB = (function () {
       document.getElementById('ehSourceBadge').textContent = 'Lädt …';
     }
     btn.classList.add('spinning');
-    HB.get('ehemalige', CR_CONFIG.SHEET_URL + '?action=ehemalige', force === true).then(function (data) {
-      applyEhemalige(data, null);
-    }).catch(function (err) {
+    HB.get('ehemalige', CR_CONFIG.SHEET_URL + '?action=ehemalige', force === true).catch(function (err) {
       if (shown) {
         const b = document.getElementById('ehSourceBadge');
         b.textContent = 'Stand ' + HB.stamp(c.t) + ' · ' + err.message; b.className = 'cr-source-badge';
@@ -2766,11 +2794,12 @@ window.initStatsMap = function () {
       if (!currentData.length) setBadge('Keine Daten', false);
       else setBadge(staleT ? 'Stand ' + HB.stamp(staleT) : 'Live', !staleT);
     }
+    HB.on('unternehmen', function (raw) { applyStand(raw, null); });
     function loadLiveData() {
       if (!ST_CONFIG.SHEET_URL) { setBadge('Keine Sheet-URL', false); redrawDots(); return; }
       const c = HB.cached('unternehmen');
       if (c) applyStand(c.data, c.fresh ? null : c.t); else setBadge('Lädt …', false);
-      HB.get('unternehmen', hbUnternehmenUrl()).then(function (raw) { applyStand(raw, null); })
+      HB.get('unternehmen', hbUnternehmenUrl())
         .catch(function (err) { setBadge(c ? 'Stand ' + HB.stamp(c.t) + ' · ' + err.message : err.message, false); });
     }
   });
@@ -2818,21 +2847,18 @@ window.initHubMap = function () {
 
   /* Belegte Hauptsitze live holen. alle=1: auch Airlines unter 3 Stationen –
      eine frisch gegründete Airline belegt ihren Hub genauso. */
+  /* Belegte Hauptsitze. Liefert den besten sofort verfügbaren Stand und –
+     falls das nur der gespeicherte war – die frische Abfrage zum Nachreichen.
+     Setzt selbst KEINEN Kartenzustand: das macht der Aufrufer, der die Karte hält. */
+  function keepTaken(raw) { return raw.filter(function (r) { return r && r.name && r.hqCode; }); }
   function loadTaken() {
-    const keep = function (raw) { return raw.filter(function (r) { return r && r.name && r.hqCode; }); };
     if (!ST_CONFIG.SHEET_URL) return Promise.reject(new Error('Keine Sheet-URL hinterlegt'));
     const c = HB.cached('unternehmen');
     const fresh = HB.get('unternehmen', hbUnternehmenUrl());
-    if (c) {
-      /* Sofort mit dem letzten Stand zeichnen, frische Daten danach nachreichen. */
-      fresh.then(function (raw) { freshArrived = true; staleT = null; taken = keep(raw); setBadge('Live', true); render(); })
-           .catch(function (err) { setBadge('Stand ' + HB.stamp(c.t) + ' · ' + err.message, false); });
-      staleT = c.fresh ? null : c.t;
-      return Promise.resolve(keep(c.data));
-    }
-    return fresh.then(keep);
+    if (c && c.fresh) return Promise.resolve({ rows: keepTaken(c.data), staleT: null, update: null });
+    if (c) return Promise.resolve({ rows: keepTaken(c.data), staleT: c.t, update: fresh });
+    return fresh.then(function (raw) { return { rows: keepTaken(raw), staleT: null, update: null }; });
   }
-  let staleT = null, freshArrived = false;
 
   const jobs = [];
   if (!window.AIRPORTS || !window.AIRPORTS.length) jobs.push(HB.script('airports.js'));
@@ -3051,12 +3077,23 @@ window.initHubMap = function () {
         });
       gC.selectAll('path').data(countries).join('path').attr('class', 'h-country');
       fit();
+      /* Jeder neue Datenstand – auch ein später – zeichnet die Karte neu. */
+      HB.on('unternehmen', function (raw) {
+        taken = keepTaken(raw);
+        loading.classList.add('hidden');
+        setBadge('Live', true);
+        render();
+      });
       return loadTaken();
-    }).then(function (rows) {
-      if (!freshArrived) taken = rows;      /* frische Daten nie durch den alten Stand ersetzen */
+    }).then(function (res) {
+      taken = res.rows;
       loading.classList.add('hidden');
-      setBadge(staleT ? 'Stand ' + HB.stamp(staleT) : 'Live', !staleT);
+      setBadge(res.staleT ? 'Stand ' + HB.stamp(res.staleT) : 'Live', !res.staleT);
       render();
+      /* War es nur der gespeicherte Stand: frische Daten nachreichen, sobald da */
+      if (res.update) {
+        res.update.catch(function (err) { setBadge('Stand ' + HB.stamp(res.staleT) + ' · ' + err.message, false); });
+      }
     }).catch(function (err) {
       /* Ohne Belegung lässt sich nicht sagen, was frei ist – lieber
          ehrlich melden als alles fälschlich als frei zu zeigen. */
@@ -3348,13 +3385,15 @@ window.initStatsDashboard = function () {
     render();
   }
 
+  HB.on('unternehmen', function (raw) { apply(raw, null); });
+
   function load(force) {
     if (!ST_CONFIG.SHEET_URL) { badge('Keine Sheet-URL', false); showEmpty('Keine Sheet-URL hinterlegt.'); return; }
     const c = HB.cached('unternehmen');
     if (!data.length && c) apply(c.data, c.fresh ? null : c.t);
     if (!data.length) { badge('Lädt …', false); showEmpty('Lade Daten aus dem Sheet …'); }
     $('dbRefreshBtn').classList.add('spinning');
-    HB.get('unternehmen', hbUnternehmenUrl(), force === true).then(function (raw) { apply(raw, null); })
+    HB.get('unternehmen', hbUnternehmenUrl(), force === true)
       .catch(function (err) {
         if (data.length) badge((c ? 'Stand ' + HB.stamp(c.t) + ' · ' : '') + err.message, false);
         else { badge(err.message, false); showEmpty(err.message + ' – Sheet nicht erreichbar.'); }
