@@ -1168,9 +1168,9 @@ h1:hover {
       </div>
       <div class="stats-legend">
         <div class="sl-dot"></div>
-        <span id="statsLegendCount">Airline (&gt;2 Stationen)</span>
+        <span id="statsLegendCount">Airlines (ab 3 Stationen)</span>
       </div>
-      <div class="stats-badge" id="statsBadge">Demo</div>
+      <div class="stats-badge" id="statsBadge">Lädt …</div>
     </div>
   </section>
 
@@ -2103,20 +2103,6 @@ const ST_URL = '__STATS_URL__';
 const ST_CONFIG = { SHEET_URL: ST_URL.slice(0, 2) === '__' ? '' : ST_URL };
 
 
-/* ── Dummy-Daten (solange SHEET_URL leer) ── */
-const ST_DUMMY = [
-  {id:31,name:'Austrian Airlines Holding',ceo:'Stephan.Skocek',hqCode:'VIE',stations:12,flotte:8,passagiere:'1.2M',finanzrating:'BB'},
-  {id:45,name:'Hindenburg Air',ceo:'Adler1183',hqCode:'FRA',stations:18,flotte:14,passagiere:'3.4M',finanzrating:'AAA'},
-  {id:52,name:'Nordic Wings',ceo:'NordicPilot',hqCode:'ARN',stations:7,flotte:5,passagiere:'890k',finanzrating:'A'},
-  {id:60,name:'Balkan Express',ceo:'BalkanAce',hqCode:'SOF',stations:5,flotte:4,passagiere:'420k',finanzrating:'BBB'},
-  {id:71,name:'Iberia Connect',ceo:'MadridFlyer',hqCode:'MAD',stations:9,flotte:7,passagiere:'1.8M',finanzrating:'AA'},
-  {id:88,name:'Pacific Routes',ceo:'IslandHopper',hqCode:'SYD',stations:6,flotte:5,passagiere:'750k',finanzrating:'A'},
-  {id:99,name:'Gulf Express',ceo:'DesertWings',hqCode:'DXB',stations:11,flotte:9,passagiere:'2.1M',finanzrating:'AAA'},
-  {id:110,name:'Transatlantic Co',ceo:'AtlantaHub',hqCode:'ATL',stations:14,flotte:11,passagiere:'4.2M',finanzrating:'AA'},
-  {id:120,name:'Asia Pacific Air',ceo:'SingaporeCEO',hqCode:'SIN',stations:16,flotte:13,passagiere:'5.1M',finanzrating:'AAA'},
-  {id:135,name:'Balkavia',ceo:'BelgradeFlyer',hqCode:'BEG',stations:4,flotte:3,passagiere:'310k',finanzrating:'B'},
-];
-
 /* ── Haupt-Funktion ── */
 window.initStatsMap = function () {
   const wrap    = document.getElementById('statsMapWrap');
@@ -2209,7 +2195,7 @@ window.initStatsMap = function () {
 
     /* Daten */
     var ranks       = {};
-    var currentData = ST_DUMMY.slice();
+    var currentData = [];   /* nur echte Sheet-Daten, keine Platzhalter */
     var activeCode  = null;
 
     function toNum(s) {
@@ -2223,7 +2209,8 @@ window.initStatsMap = function () {
         srt.forEach(function(d,i){ m[d.id] = i+1; });
         return m;
       }
-      return { stations:by('stations',Number), flotte:by('flotte',Number), passagiere:by('passagiere',toNum) };
+      return { stations:by('stations',Number), flotte:by('flotte',Number),
+               passagiere:by('passagiere',toNum), fracht:by('fracht',toNum) };
     }
     ranks = computeRanks(currentData);
 
@@ -2289,9 +2276,7 @@ window.initStatsMap = function () {
             .text(airlines.length);
         }
       });
-      if (legend) legend.textContent = currentData.length + ' Airlines (>2 Stationen)';
-      if (badge && !badge.classList.contains('live'))
-        badge.textContent = 'Demo';
+      if (legend) legend.textContent = currentData.length + ' Airlines (ab 3 Stationen)';
     }
 
     /* Popup */
@@ -2327,13 +2312,14 @@ window.initStatsMap = function () {
         '<div class="sp-sub">CEO: '+esc(d.ceo||'—')+
           (d.allianz?'<br>Allianz: '+esc(d.allianz):'')+
           (d.gegruendet?'<br>Gegründet: '+esc(d.gegruendet):'')+
+          (d.kontinent?'<br>Kontinent: '+esc(d.kontinent):'')+
         '</div>'+
         '<div class="sp-divider"></div>'+
         '<div class="sp-section-label">Statistiken</div>'+
         statRow(fmtNum(d.stations),   'Stationen',    ranks.stations&&ranks.stations[d.id],     n)+
         statRow(fmtNum(d.flotte),     'Flottengröße', ranks.flotte&&ranks.flotte[d.id],         n)+
         statRow(fmtNum(d.passagiere), 'Passagiere',   ranks.passagiere&&ranks.passagiere[d.id], n)+
-        statRow(d.fracht||'—',     'Fracht',       null, n)+
+        statRow(fmtNum(d.fracht)+' FE', 'Fracht',     ranks.fracht&&ranks.fracht[d.id],         n)+
         statRow(d.finanzrating||'—','Finanzrating', null, n);
       popup.classList.add('open');
     }
@@ -2390,25 +2376,33 @@ window.initStatsMap = function () {
       fitWorld();
     });
 
+    function setBadge(text, live) {
+      if (!badge) return;
+      badge.textContent = text;
+      badge.className = 'stats-badge' + (live ? ' live' : '');
+    }
+
     function loadLiveData() {
-      if (!ST_CONFIG.SHEET_URL) return;
+      if (!ST_CONFIG.SHEET_URL) { setBadge('Keine Sheet-URL', false); redrawDots(); return; }
+      setBadge('Lädt …', false);
       const cb = '__stCB_' + Date.now();
-      const timer = setTimeout(function(){ delete window[cb]; }, 9000);
+      /* Apps Script braucht beim Kaltstart oft deutlich mehr als 9 s. */
+      const timer = setTimeout(function(){ delete window[cb]; setBadge('Zeitüberschreitung', false); }, 25000);
       window[cb] = function(raw) {
         clearTimeout(timer); delete window[cb];
         const el=document.getElementById('jsonpSt');
         if(el) el.parentNode.removeChild(el);
-        if (Array.isArray(raw) && raw.length) {
-          currentData = raw.filter(function(r){ return (r.stations||0) > 2; });
-          ranks = computeRanks(currentData);
-          redrawDots();
-          if(badge){ badge.textContent='Live'; badge.className='stats-badge live'; }
-        }
+        if (!Array.isArray(raw)) { setBadge('Sheet-Fehler', false); return; }
+        /* Das Backend filtert schon – hier nur zur Sicherheit erneut. */
+        currentData = raw.filter(function(r){ return (r.stations||0) >= 3 && r.hqCode; });
+        ranks = computeRanks(currentData);
+        redrawDots();
+        setBadge(currentData.length ? 'Live' : 'Keine Daten', currentData.length > 0);
       };
       const s = document.createElement('script');
       s.id = 'jsonpSt';
       s.src = ST_CONFIG.SHEET_URL + '?action=unternehmen&callback=' + cb;
-      s.onerror = function(){ clearTimeout(timer); delete window[cb]; };
+      s.onerror = function(){ clearTimeout(timer); delete window[cb]; setBadge('Keine Verbindung', false); };
       document.head.appendChild(s);
     }
   });
