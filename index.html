@@ -644,7 +644,87 @@ h1:hover {
 ══════════════════════════════════════════ */
 #p-hubs { display: flex; flex-direction: column; }
 #p-hubs .panel-topbar { flex-shrink: 0; }
-#hubFrame { flex: 1; border: none; width: 100%; display: block; }
+#hubMapWrap { flex: 1; position: relative; overflow: hidden; }
+#hubMap { width: 100%; height: 100%; display: block; cursor: grab; }
+#hubMap:active { cursor: grabbing; }
+
+/* Umschalter Flughäfen / Länder */
+.hub-toggle {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 50;
+  display: flex; padding: 3px; gap: 2px;
+  background: rgba(8,12,72,.92); border: 1px solid rgba(255,255,255,.1); border-radius: 11px;
+}
+.hub-tg {
+  border: 0; background: none; color: rgba(255,255,255,.5);
+  font: 600 .78rem 'DM Sans', system-ui, sans-serif; letter-spacing: .02em;
+  padding: 7px 16px; border-radius: 8px; cursor: pointer; transition: background .18s, color .18s;
+}
+.hub-tg:hover { color: #fff; }
+.hub-tg.active { background: #2DCFB3; color: #071040; }
+
+/* Länder */
+.h-country { stroke: rgba(255,255,255,.14); stroke-width: .4; transition: fill .25s; }
+.h-country.neutral { fill: #1a2170; }
+.h-country.free     { fill: #1f9a86; }   /* deckend – Bubbles dahinter würden die Farbe verwaschen */
+.h-country.taken    { fill: #b8325f; }
+.h-country:hover    { stroke: #fff; stroke-width: 1; }
+.h-country.free:hover  { fill: #28b9a1; }
+.h-country.taken:hover { fill: #d63d70; }
+#hubMap.view-airports .h-country { fill: rgba(14,22,110,.62); stroke: rgba(45,207,179,.17); }
+
+/* freie Flughäfen */
+.h-dot { fill: #2DCFB3; stroke: rgba(7,16,64,.85); cursor: pointer; transition: fill .15s; }
+.h-dot:hover, .h-dot.active { fill: #fff; }
+.h-dot.pax10 { fill: #2DCFB3; }
+.h-dot.pax9  { fill: #7fe3d1; }
+.h-dot.pax8  { fill: #bdf0e6; }
+.h-mark { fill: #F03B6D; stroke: rgba(7,16,64,.85); }   /* Hauptsitz in Kleinstaat ohne Landesfläche */
+
+.hub-legend {
+  position: absolute; bottom: 24px; left: 24px; z-index: 50;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 13px; border-radius: 11px;
+  background: rgba(8,12,72,.88); border: 1px solid rgba(255,255,255,.08);
+  font-size: .7rem; color: rgba(255,255,255,.55); pointer-events: none;
+}
+.hub-legend .hl-row { display: flex; align-items: center; gap: 8px; }
+.hub-legend .hl-sw  { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.hub-legend .hl-dot { border-radius: 50%; background: #2DCFB3; flex-shrink: 0; }
+.hub-legend .hl-head { color: rgba(255,255,255,.85); font-weight: 700; font-size: .74rem; }
+#hubBadge { top: 16px; right: 16px; }
+
+/* Seitenleiste mit Details */
+#hubPopup {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 320px; max-width: 85vw; z-index: 80;
+  background: rgba(6,10,58,.97); border-right: 1px solid rgba(45,207,179,.18);
+  overflow-y: auto; transform: translateX(-100%);
+  transition: transform .32s cubic-bezier(.16,1,.3,1); box-shadow: 6px 0 40px rgba(0,0,0,.5);
+}
+#hubPopup.open { transform: translateX(0); }
+#hubPopupClose {
+  position: sticky; top: 0; width: 100%; display: flex; justify-content: flex-end;
+  padding: 14px 16px 8px; background: rgba(6,10,58,.95); border: 0; cursor: pointer;
+}
+#hubPopupClose svg { stroke: rgba(255,255,255,.5); }
+#hpContent { padding: 0 22px 24px; }
+.hp-code { display: inline-block; font: 800 .8rem 'Nunito', sans-serif; letter-spacing: .08em; color: #2DCFB3;
+  background: rgba(45,207,179,.1); border: 1px solid rgba(45,207,179,.25); border-radius: 6px; padding: 2px 8px; margin-bottom: 10px; }
+.hp-code.taken { color: #F03B6D; background: rgba(240,59,109,.1); border-color: rgba(240,59,109,.3); }
+.hp-name { font: 900 1.35rem/1.2 'Nunito', sans-serif; color: #fff; margin-bottom: 6px; }
+.hp-sub  { font-size: .8rem; color: rgba(255,255,255,.45); line-height: 1.6; }
+.hp-div  { height: 1px; background: rgba(255,255,255,.08); margin: 16px 0; }
+.hp-lbl  { font-size: .62rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.3); margin-bottom: 8px; }
+.hp-bar  { display: flex; gap: 3px; margin: 4px 0 2px; }
+.hp-bar i { flex: 1; height: 8px; border-radius: 2px; background: rgba(255,255,255,.08); }
+.hp-bar i.on { background: #2DCFB3; }
+.hp-item { padding: 9px 11px; border-radius: 9px; background: rgba(255,255,255,.04); margin-bottom: 6px; font-size: .8rem; color: rgba(255,255,255,.75); }
+.hp-item b { color: #fff; }
+.hp-item small { display: block; color: rgba(255,255,255,.4); font-size: .7rem; margin-top: 2px; }
+@media (max-width: 600px) {
+  .hub-toggle { top: 10px; }
+  .hub-legend { left: 12px; bottom: 12px; }
+  #hubBadge { top: 58px; right: 12px; }
+}
 
 /* ══════════════════════════════════════════
    PANEL 3 – STATISTIKEN MAP
@@ -894,7 +974,7 @@ h1:hover {
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           </div>
           <span class="card-label">Hubs</span>
-          <p class="card-desc">Wähle deine 10 wichtigsten Flughafen-Hubs und sieh sie auf der Weltkarte.</p>
+          <p class="card-desc">Freie Hubs: die größten Flughäfen und Länder, die noch kein Spieler belegt hat.</p>
           <div class="card-arrow">
             Zur Karte
             <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
@@ -1130,7 +1210,36 @@ h1:hover {
         <span class="topbar-section">Hubs</span>
       </div>
     </header>
-    <iframe id="hubFrame" data-src="hubs.html" title="Hubs Weltkarte" allowfullscreen></iframe>
+    <div id="hubMapWrap">
+      <div id="hubLoading" class="stats-loading">
+        <svg class="spin-icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        <span id="hubLoadingText">Karte wird geladen…</span>
+      </div>
+      <svg id="hubMap"></svg>
+
+      <div class="hub-toggle" role="tablist" aria-label="Ansicht">
+        <button class="hub-tg active" data-view="airports" role="tab" aria-selected="true">Flughäfen</button>
+        <button class="hub-tg" data-view="countries" role="tab" aria-selected="false">Länder</button>
+      </div>
+
+      <div id="hubPopup">
+        <button id="hubPopupClose" aria-label="Schließen">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <div id="hpContent"></div>
+      </div>
+
+      <div class="hub-legend" id="hubLegend"></div>
+      <div class="stats-badge" id="hubBadge">Lädt …</div>
+
+      <div class="stats-ctrl">
+        <button class="s-btn" id="hZoomIn"  title="Reinzoomen">+</button>
+        <button class="s-btn" id="hZoomOut" title="Rauszoomen">−</button>
+        <button class="s-btn" id="hReset"   title="Zurücksetzen">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+      </div>
+    </div>
   </section>
 
   <!-- ─── PANEL 3: STATISTIKEN ─── -->
@@ -1188,7 +1297,7 @@ h1:hover {
                       Hubs
   ══════════════════════════════════════════ */
   const mapWorld = document.getElementById('mapWorld');
-  let hubFrameLoaded   = false;
+  let hubMapInited     = false;
   let statsMapInited   = false;
 
   const PANEL_TRANSFORMS = {
@@ -1223,10 +1332,9 @@ h1:hover {
     if (el && name !== 'landing') el.scrollTop = 0;
 
     /* Lazy-load Hubs iframe */
-    if (name === 'hubs' && !hubFrameLoaded) {
-      const iframe = document.getElementById('hubFrame');
-      iframe.src = iframe.dataset.src;
-      hubFrameLoaded = true;
+    if (name === 'hubs' && !hubMapInited) {
+      hubMapInited = true;
+      if (typeof initHubMap === 'function') initHubMap();
     }
 
     /* Lazy-init Statistiken map */
@@ -2412,5 +2520,303 @@ window.initStatsMap = function () {
 
 
 </script>
+
+<!-- ═══════════════════════════════════════════════════════
+     HUBS: freie Flughäfen & Länder
+═══════════════════════════════════════════════════════ -->
+<script>
+/* Flughäfen mit PAX-Balken 8–10 aus der Airport-Datenbank des Sheets
+   ([IATA, PAX-Balken, Name im Spiel]). Die Stufen ändern sich praktisch
+   nie, deshalb liegen sie fest hier. Welche Hubs belegt sind, kommt
+   dagegen live aus dem Unternehmen-Sheet (Hauptsitze aller Airlines). */
+const HUB_PAX = [["AMS",10,"Amsterdam"],["ATL",10,"Atlanta"],["AYT",10,"Antalya"],["BCN",10,"Barcelona"],["BKK",10,"Bangkok"],["BOM",10,"Mumbai"],["BOS",10,"Boston"],["CAN",10,"Guangzhou"],["CDG",10,"Paris"],["CGK",10,"Jakarta"],["CKG",10,"Chongqing"],["CLT",10,"Charlotte"],["CTU",10,"Chengdu"],["DEL",10,"Delhi"],["DEN",10,"Denver"],["DFW",10,"Dallas"],["DMK",10,"Bangkok"],["DOH",10,"Doha"],["DTW",10,"Detroit"],["DXB",10,"Dubai"],["EWR",10,"Newark"],["FCO",10,"Rome Fiumicino"],["FLL",10,"Fort Lauderdale"],["FRA",10,"Frankfurt"],["GRU",10,"Sao Paulo Guarulhos"],["HGH",10,"Hangzhou"],["HKG",10,"Hong Kong International"],["HND",10,"Tokyo Haneda"],["IAH",10,"Houston"],["ICN",10,"Seoul Incheon"],["IST",10,"Istanbul New"],["JFK",10,"New York"],["KMG",10,"Kunming"],["KUL",10,"Kuala Lumpur International"],["LAS",10,"Las Vegas McCarran"],["LAX",10,"Los Angeles"],["LGW",10,"London Gatwick"],["LHR",10,"London Heathrow"],["MAD",10,"Madrid"],["MCO",10,"Orlando International"],["MEL",10,"Melbourne Tullamarine"],["MEX",10,"Mexico City"],["MIA",10,"Miami International"],["MSP",10,"Minneapolis/St. Paul"],["MUC",10,"Munich"],["NRT",10,"Tokyo Narita"],["ORD",10,"Chicago O'Hare"],["PEK",10,"Beijing Capital"],["PHX",10,"Phoenix"],["PKX",10,"Beijing Daxing"],["PVG",10,"Shanghai Pu Dong"],["SEA",10,"Seattle/Tacoma"],["SFO",10,"San Francisco"],["SHA",10,"Shanghai Hongqiao"],["SIN",10,"Singapore"],["SYD",10,"Sydney Kingsford Smith"],["SZX",10,"Shenzhen"],["XIY",10,"Xi An Xianyang"],["YYZ",10,"Toronto Pearson"],["ARN",9,"Stockholm Arlanda"],["ATH",9,"Athens"],["BER",9,"Berlin"],["BLR",9,"Bengaluru"],["BNE",9,"Brisbane"],["BOG",9,"Bogota"],["BRU",9,"Brussels Zaventem"],["BWI",9,"Baltimore"],["CCU",9,"Kolkata"],["CGH",9,"Sao Paulo Congonhas"],["CGO",9,"Zhengzhou"],["CJU",9,"Jeju"],["CPH",9,"Copenhagen"],["CSX",9,"Changsha Huanghua"],["CTS",9,"Sapporo Chitose"],["CUN",9,"Cancun"],["DCA",9,"Washington"],["DME",9,"Moscow"],["DPS",9,"Denpasar Bali"],["DUB",9,"Dublin"],["DUS",9,"Dusseldorf"],["FUK",9,"Fukuoka"],["GMP",9,"Seoul Gimpo"],["HAK",9,"Haikou"],["HAN",9,"Hanoi"],["IAD",9,"Washington"],["KIX",9,"Osaka Kansai"],["KWE",9,"Guiyang"],["LGA",9,"La Guardia"],["LIM",9,"Lima"],["LIS",9,"Lisbon"],["MAA",9,"Chennai (Madras)"],["MAN",9,"Manchester, GB"],["MNL",9,"Manila"],["MXP",9,"Milan Malpensa"],["NKG",9,"Nanjing"],["ORY",9,"Paris"],["OSL",9,"Oslo Gardermoen"],["PHL",9,"Philadelphia"],["PMI",9,"Palma de Mallorca"],["SAN",9,"San Diego"],["SAW",9,""],["SCL",9,"Santiago de Chile"],["SGN",9,"Ho Chi Minh City"],["SLC",9,"Salt Lake City"],["STN",9,"London Stansted"],["SVO",9,"Moscow"],["TAO",9,"Qingdao"],["TLV",9,"Tel Aviv Ben Gurion"],["TPA",9,"Tampa"],["TPE",9,"Taiwan Taoyuan International"],["TSN",9,"Tianjin"],["URC",9,"Urumqi"],["VIE",9,"Vienna"],["WUH",9,"Wuhan"],["XMN",9,"Istanbul"],["YVR",9,"Vancouver"],["ZRH",9,"Zurich"],["AGP",8,"Malaga"],["AKL",8,"Auckland"],["ALC",8,"Alicante"],["AUH",8,"Abu Dhabi"],["AUS",8,"Austin"],["BNA",8,"Nashville"],["BSB",8,"Brasilia"],["BUD",8,"Budapest"],["CAI",8,"Cairo"],["DAD",8,"Da Nang"],["DAL",8,"Dallas"],["DLC",8,"Dalian"],["EDI",8,"Edinburgh"],["FOC",8,"Fuzhou"],["GDL",8,"Guadalajara"],["GVA",8,"Geneva"],["HAM",8,"Hamburg"],["HEL",8,"Helsinki"],["HKT",8,"Phuket"],["HNL",8,"Honolulu"],["HRB",8,"Harbin"],["HYD",8,"Hyderabad"],["ITM",8,"Osaka Itami"],["JED",8,"Jeddah"],["JNB",8,"Johannesburg International"],["KBP",8,"Kyiv"],["KWI",8,"Kuwait"],["LHW",8,"Lanzhou"],["LTN",8,"London Luton"],["MCT",8,"Muskat"],["MDW",8,"Chicago Midway"],["NNG",8,"Nanning"],["OKA",8,"Okinawa"],["OTP",8,"Bucharest Henri Coanda"],["PDX",8,"Portland, OR, US"],["PRG",8,"Prague"],["PTY",8,"Panama City"],["PUS",8,"Busan"],["SHE",8,"Shenyang"],["SJC",8,"San Jose, CA, US"],["STL",8,"St. Louis"],["SUB",8,"Surabaya"],["SYX",8,"Sanya"],["TNA",8,"Jinan"],["WAW",8,"Warsaw"],["YUL",8,"Montreal"],["YYC",8,"Calgary"]];
+
+/* world-atlas (ISO-Nummer) → ISO-Ländercode wie in airports.js */
+const HUB_NUM2A2 = {"242":"FJ","834":"TZ","732":"EH","124":"CA","840":"US","398":"KZ","860":"UZ","598":"PG","360":"ID","032":"AR","152":"CL","180":"CD","706":"SO","404":"KE","729":"SD","148":"TD","332":"HT","214":"DO","643":"RU","044":"BS","238":"FK","578":"NO","304":"GL","260":"TF","626":"TL","710":"ZA","426":"LS","484":"MX","858":"UY","076":"BR","068":"BO","604":"PE","170":"CO","591":"PA","188":"CR","558":"NI","340":"HN","222":"SV","320":"GT","084":"BZ","862":"VE","328":"GY","740":"SR","250":"FR","218":"EC","630":"PR","388":"JM","192":"CU","716":"ZW","072":"BW","516":"NA","686":"SN","466":"ML","478":"MR","204":"BJ","562":"NE","566":"NG","120":"CM","768":"TG","288":"GH","384":"CI","324":"GN","624":"GW","430":"LR","694":"SL","854":"BF","140":"CF","178":"CG","266":"GA","226":"GQ","894":"ZM","454":"MW","508":"MZ","748":"SZ","024":"AO","108":"BI","376":"IL","422":"LB","450":"MG","275":"PS","270":"GM","788":"TN","012":"DZ","400":"JO","784":"AE","634":"QA","414":"KW","368":"IQ","512":"OM","548":"VU","116":"KH","764":"TH","418":"LA","104":"MM","704":"VN","408":"KP","410":"KR","496":"MN","356":"IN","050":"BD","064":"BT","524":"NP","586":"PK","004":"AF","762":"TJ","417":"KG","795":"TM","364":"IR","760":"SY","051":"AM","752":"SE","112":"BY","804":"UA","616":"PL","040":"AT","348":"HU","498":"MD","642":"RO","440":"LT","428":"LV","233":"EE","276":"DE","100":"BG","300":"GR","792":"TR","008":"AL","191":"HR","756":"CH","442":"LU","056":"BE","528":"NL","620":"PT","724":"ES","372":"IE","540":"NC","090":"SB","554":"NZ","036":"AU","144":"LK","156":"CN","158":"TW","380":"IT","208":"DK","826":"GB","352":"IS","031":"AZ","268":"GE","608":"PH","458":"MY","096":"BN","705":"SI","246":"FI","703":"SK","203":"CZ","232":"ER","392":"JP","600":"PY","887":"YE","682":"SA","010":"AQ","196":"CY","504":"MA","818":"EG","434":"LY","231":"ET","262":"DJ","800":"UG","646":"RW","070":"BA","807":"MK","688":"RS","499":"ME","780":"TT","728":"SS"};
+
+window.initHubMap = function () {
+  const wrap    = document.getElementById('hubMapWrap');
+  const svgEl   = document.getElementById('hubMap');
+  const loading = document.getElementById('hubLoading');
+  const loadTxt = document.getElementById('hubLoadingText');
+  const popup   = document.getElementById('hubPopup');
+  const content = document.getElementById('hpContent');
+  const legend  = document.getElementById('hubLegend');
+  const badge   = document.getElementById('hubBadge');
+  const DE      = (window.Intl && Intl.DisplayNames) ? new Intl.DisplayNames(['de'], { type: 'region' }) : null;
+  const land    = function (a2) { try { return (DE && a2) ? DE.of(a2) : (a2 || '—'); } catch (e) { return a2 || '—'; } };
+
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function setBadge(text, live) {
+    badge.textContent = text;
+    badge.className = 'stats-badge' + (live ? ' live' : '');
+  }
+  function loadOnce(src) {
+    return new Promise(function (res) {
+      const s = document.createElement('script');
+      s.src = src; s.async = true; s.onload = res; s.onerror = res;
+      document.head.appendChild(s);
+    });
+  }
+
+  /* Belegte Hauptsitze live holen. alle=1: auch Airlines unter 3 Stationen –
+     eine frisch gegründete Airline belegt ihren Hub genauso. */
+  function loadTaken() {
+    return new Promise(function (resolve, reject) {
+      const url = (typeof ST_CONFIG !== 'undefined') ? ST_CONFIG.SHEET_URL : '';
+      if (!url) { reject(new Error('Keine Sheet-URL hinterlegt')); return; }
+      const cb = '__hubCB_' + Date.now();
+      const s  = document.createElement('script');
+      const timer = setTimeout(function () { cleanup(); reject(new Error('Zeitüberschreitung')); }, 25000);
+      function cleanup() { clearTimeout(timer); delete window[cb]; s.remove(); }
+      window[cb] = function (raw) {
+        cleanup();
+        if (!Array.isArray(raw)) reject(new Error('Sheet-Fehler'));
+        else resolve(raw.filter(function (r) { return r && r.name && r.hqCode; }));
+      };
+      s.onerror = function () { cleanup(); reject(new Error('Keine Verbindung')); };
+      s.src = url + '?action=unternehmen&alle=1&callback=' + cb;
+      document.head.appendChild(s);
+    });
+  }
+
+  const jobs = [];
+  if (!window.AIRPORTS || !window.AIRPORTS.length) jobs.push(loadOnce('airports.js'));
+  if (typeof window.d3 === 'undefined')            jobs.push(loadOnce('https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js'));
+  if (typeof window.topojson === 'undefined')      jobs.push(loadOnce('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js'));
+
+  Promise.all(jobs).then(function () {
+    if (typeof window.d3 === 'undefined') { loadTxt.textContent = 'Karte konnte nicht geladen werden.'; return; }
+
+    const AP = {};
+    (window.AIRPORTS || []).forEach(function (a) { if (a && a[0]) AP[a[0]] = a; });   // [IATA, Name, Stadt, Land, lat, lon]
+
+    const W = function () { return wrap.clientWidth  || window.innerWidth; };
+    const H = function () { return wrap.clientHeight || (window.innerHeight - 56); };
+    const proj = d3.geoNaturalEarth1();
+    const path = d3.geoPath().projection(proj);
+    const svg  = d3.select(svgEl).attr('width', W()).attr('height', H());
+    const g    = svg.append('g');
+    const gC   = g.append('g');          // Länder
+    const gD   = g.append('g');          // Punkte
+    let k = 1, view = 'airports', taken = null, countries = [];
+
+    const zoom = d3.zoom().scaleExtent([0.8, 14]).on('zoom', function (ev) {
+      k = ev.transform.k;
+      g.attr('transform', ev.transform);
+      gD.selectAll('circle').attr('r', function (d) { return d.r / k; }).attr('stroke-width', 1.2 / k);
+      gC.selectAll('path').attr('stroke-width', 0.4 / k);
+    });
+    svg.call(zoom).on('click', closePopup);
+    document.getElementById('hZoomIn').onclick  = function () { svg.transition().duration(300).call(zoom.scaleBy, 1.6); };
+    document.getElementById('hZoomOut').onclick = function () { svg.transition().duration(300).call(zoom.scaleBy, 0.625); };
+    document.getElementById('hReset').onclick   = function () { svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity); closePopup(); };
+    document.getElementById('hubPopupClose').onclick = closePopup;
+
+    function closePopup() {
+      popup.classList.remove('open');
+      gD.selectAll('.h-dot').classed('active', false);
+    }
+
+    function fit() {
+      const w = W(), h = H();
+      svg.attr('width', w).attr('height', h);
+      proj.scale(1).translate([0, 0]);
+      const b  = path.bounds({ type: 'Sphere' });
+      const sc = Math.min(w / (b[1][0] - b[0][0]), h / (b[1][1] - b[0][1])) * 0.92;
+      proj.scale(sc).translate([w / 2, h / 2]);
+      gC.selectAll('path').attr('d', path);
+      render();
+    }
+    window.addEventListener('resize', fit);
+
+    /* ── Belegung auswerten ── */
+    function analyse() {
+      const byCode = {}, byLand = {};
+      taken.forEach(function (r) {
+        const code = r.hqCode;
+        (byCode[code] = byCode[code] || []).push(r);
+        const a = AP[code];
+        if (a) (byLand[a[3]] = byLand[a[3]] || []).push(r);
+      });
+      const free = HUB_PAX.filter(function (h) { return !byCode[h[0]] && AP[h[0]]; });
+      return { byCode: byCode, byLand: byLand, free: free };
+    }
+
+    function render() {
+      gD.selectAll('*').remove();
+      svgEl.classList.toggle('view-airports', view === 'airports');
+      if (!taken) return;
+      const A = analyse();
+
+      if (view === 'airports') {
+        gC.selectAll('path').attr('class', 'h-country').on('click', null).select('title').remove();
+        const pts = A.free.map(function (h) {
+          const a = AP[h[0]];
+          const p = proj([a[5], a[4]]);
+          return { iata: h[0], pax: h[1], name: h[2], ap: a, x: p[0], y: p[1], r: h[1] === 10 ? 5.5 : h[1] === 9 ? 4.3 : 3.3 };
+        }).filter(function (d) { return isFinite(d.x) && isFinite(d.y); })
+          .sort(function (a, b) { return a.pax - b.pax; });           // große Punkte oben
+
+        gD.selectAll('circle').data(pts).join('circle')
+          .attr('class', function (d) { return 'h-dot pax' + d.pax; })
+          .attr('cx', function (d) { return d.x; }).attr('cy', function (d) { return d.y; })
+          .attr('r', function (d) { return d.r / k; }).attr('stroke-width', 1.2 / k)
+          .on('click', function (ev, d) {
+            ev.stopPropagation();
+            gD.selectAll('.h-dot').classed('active', false);
+            d3.select(this).classed('active', true);
+            showAirport(d);
+          })
+          .append('title').text(function (d) { return d.iata + ' · ' + d.name + ' · PAX ' + d.pax; });
+
+        const n10 = A.free.filter(function (h) { return h[1] === 10; }).length;
+        const n9  = A.free.filter(function (h) { return h[1] === 9;  }).length;
+        const n8  = A.free.filter(function (h) { return h[1] === 8;  }).length;
+        legend.innerHTML =
+          '<div class="hl-head">' + A.free.length + ' von ' + HUB_PAX.length + ' großen Flughäfen frei</div>' +
+          '<div class="hl-row"><i class="hl-dot" style="width:11px;height:11px"></i>PAX 10 · ' + n10 + ' frei</div>' +
+          '<div class="hl-row"><i class="hl-dot" style="width:9px;height:9px;background:#7fe3d1"></i>PAX 9 · ' + n9 + ' frei</div>' +
+          '<div class="hl-row"><i class="hl-dot" style="width:7px;height:7px;background:#bdf0e6"></i>PAX 8 · ' + n8 + ' frei</div>';
+      } else {
+        gC.selectAll('path')
+          .attr('class', function (f) {
+            if (!f.a2) return 'h-country neutral';
+            return 'h-country ' + (A.byLand[f.a2] ? 'taken' : 'free');
+          })
+          .on('click', function (ev, f) { ev.stopPropagation(); if (f.a2) showCountry(f.a2, A); });
+        gC.selectAll('path').each(function (f) {
+          let t = d3.select(this).select('title');
+          if (t.empty()) t = d3.select(this).append('title');
+          t.text(f.a2 ? land(f.a2) + (A.byLand[f.a2] ? ' · belegt (' + A.byLand[f.a2].length + ')' : ' · frei') : f.properties.name);
+        });
+
+        /* Hauptsitze in Ländern ohne eigene Fläche im Kartensatz
+           (Singapur, Malediven, Malta …) als roter Punkt zeigen. */
+        const drawn = {};
+        countries.forEach(function (f) { if (f.a2) drawn[f.a2] = true; });
+        const marks = [];
+        Object.keys(A.byLand).forEach(function (a2) {
+          if (drawn[a2]) return;
+          A.byLand[a2].forEach(function (r) {
+            const a = AP[r.hqCode]; if (!a) return;
+            const p = proj([a[5], a[4]]);
+            marks.push({ a2: a2, x: p[0], y: p[1], r: 3.5 });
+          });
+        });
+        gD.selectAll('circle').data(marks).join('circle')
+          .attr('class', 'h-mark')
+          .attr('cx', function (d) { return d.x; }).attr('cy', function (d) { return d.y; })
+          .attr('r', function (d) { return d.r / k; }).attr('stroke-width', 1.2 / k)
+          .on('click', function (ev, d) { ev.stopPropagation(); showCountry(d.a2, A); })
+          .append('title').text(function (d) { return land(d.a2) + ' · belegt'; });
+
+        const nTaken = Object.keys(A.byLand).length;
+        const nFree  = countries.filter(function (f) { return f.a2 && !A.byLand[f.a2]; }).length;
+        legend.innerHTML =
+          '<div class="hl-head">' + nFree + ' Länder frei · ' + nTaken + ' belegt</div>' +
+          '<div class="hl-row"><i class="hl-sw" style="background:#1f9a86"></i>frei – kein Spieler-Hauptsitz</div>' +
+          '<div class="hl-row"><i class="hl-sw" style="background:#b8325f"></i>belegt</div>';
+      }
+    }
+
+    function paxBar(p) {
+      let h = '';
+      for (let i = 1; i <= 10; i++) h += '<i' + (i <= p ? ' class="on"' : '') + '></i>';
+      return '<div class="hp-bar">' + h + '</div>';
+    }
+
+    function showAirport(d) {
+      const a2 = d.ap[3];
+      const A  = analyse();
+      const imLand = (A.byLand[a2] || []);
+      content.innerHTML =
+        '<div class="hp-code">' + esc(d.iata) + ' · frei</div>' +
+        '<div class="hp-name">' + esc(d.name) + '</div>' +
+        '<div class="hp-sub">' + esc(d.ap[2]) + ' · ' + esc(land(a2)) + '</div>' +
+        '<div class="hp-div"></div>' +
+        '<div class="hp-lbl">Passagieraufkommen</div>' + paxBar(d.pax) +
+        '<div class="hp-sub">PAX-Balken ' + d.pax + ' von 10</div>' +
+        '<div class="hp-div"></div>' +
+        '<div class="hp-lbl">Im selben Land</div>' +
+        (imLand.length
+          ? imLand.map(function (r) {
+              return '<div class="hp-item"><b>' + esc(r.name) + '</b> · ' + esc(r.hqCode) + '<small>CEO ' + esc(r.ceo || '—') + '</small></div>';
+            }).join('')
+          : '<div class="hp-sub">Noch kein Spieler in ' + esc(land(a2)) + '.</div>');
+      popup.classList.add('open');
+    }
+
+    function showCountry(a2, A) {
+      const list = A.byLand[a2] || [];
+      const freeHere = A.free.filter(function (h) { return AP[h[0]][3] === a2; });
+      content.innerHTML =
+        '<div class="hp-code' + (list.length ? ' taken' : '') + '">' + esc(a2) + ' · ' + (list.length ? 'belegt' : 'frei') + '</div>' +
+        '<div class="hp-name">' + esc(land(a2)) + '</div>' +
+        '<div class="hp-div"></div>' +
+        '<div class="hp-lbl">Hauptsitze von Spielern</div>' +
+        (list.length
+          ? list.map(function (r) {
+              const a = AP[r.hqCode];
+              return '<div class="hp-item"><b>' + esc(r.name) + '</b><small>' + esc(r.hqCode) + (a ? ' · ' + esc(a[2]) : '') + ' · CEO ' + esc(r.ceo || '—') + '</small></div>';
+            }).join('')
+          : '<div class="hp-sub">Keiner – das Land ist frei.</div>') +
+        '<div class="hp-div"></div>' +
+        '<div class="hp-lbl">Freie große Flughäfen (PAX 8–10)</div>' +
+        (freeHere.length
+          ? freeHere.map(function (h) {
+              return '<div class="hp-item"><b>' + esc(h[0]) + '</b> · ' + esc(h[2]) + '<small>PAX ' + h[1] + '</small></div>';
+            }).join('')
+          : '<div class="hp-sub">Keine.</div>');
+      popup.classList.add('open');
+    }
+
+    document.querySelectorAll('.hub-tg').forEach(function (b) {
+      b.addEventListener('click', function () {
+        view = b.dataset.view;
+        document.querySelectorAll('.hub-tg').forEach(function (x) {
+          const on = x === b;
+          x.classList.toggle('active', on);
+          x.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        closePopup();
+        render();
+      });
+    });
+
+    /* Karte und Belegung parallel laden */
+    const atlas = d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+    setBadge('Lädt …', false);
+
+    atlas.then(function (world) {
+      countries = topojson.feature(world, world.objects.countries).features
+        .filter(function (f) { return f.id !== '010'; })                      // Antarktis raus
+        .map(function (f) {
+          f.a2 = HUB_NUM2A2[f.id] || (f.properties.name === 'Kosovo' ? 'XK' : null);
+          return f;
+        });
+      gC.selectAll('path').data(countries).join('path').attr('class', 'h-country');
+      fit();
+      return loadTaken();
+    }).then(function (rows) {
+      taken = rows;
+      loading.classList.add('hidden');
+      setBadge('Live', true);
+      render();
+    }).catch(function (err) {
+      /* Ohne Belegung lässt sich nicht sagen, was frei ist – lieber
+         ehrlich melden als alles fälschlich als frei zu zeigen. */
+      loadTxt.textContent = 'Belegung konnte nicht geladen werden: ' + err.message;
+      loading.querySelector('svg') && loading.querySelector('svg').remove();
+      setBadge(err.message, false);
+    });
+  });
+};
+</script>
+
 </body>
 </html>
