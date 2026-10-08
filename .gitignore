@@ -1,0 +1,22 @@
+# Nur die Website wird veröffentlicht – alles hier bleibt lokal.
+
+# lokale Sicherungen
+*.backup-*.html
+
+# Testdateien
+_test.html
+_mock.js
+
+# Backend-Skripte (laufen bei Google, nicht auf der Website)
+apps-script*.gs
+
+# nicht Teil der Website
+credits.html
+README.md
+Airports.dat.rtf
+airports.csv
+.nojekyll
+
+# Werkzeuge / System
+.claude/
+.DS_Store
