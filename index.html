@@ -1463,6 +1463,90 @@ h1:hover {
 </div><!-- /map-world -->
 
 <script>
+/* ══════════════════════════════════════════
+   GEMEINSAMER DATENSPEICHER (HB)
+
+   Apps Script braucht beim Kaltstart oft lange. Damit nicht jede
+   Unterseite einzeln wartet:
+   · jede Quelle wird nur EINMAL abgefragt und dann geteilt,
+   · beim Seitenstart wird alles vorgeladen,
+   · der letzte gute Stand liegt im Browser (localStorage) und wird
+     sofort angezeigt, während im Hintergrund neu geladen wird,
+   · bei Zeitüberschreitung gibt es automatisch einen zweiten Versuch.
+   Gespeichert werden nur die Spieldaten, die die Seite ohnehin zeigt.
+══════════════════════════════════════════ */
+window.HB = (function () {
+  const PREFIX = 'hb:v1:';
+  const live = {};          // key -> { promise, data, t }
+  const scripts = {};       // src -> promise
+
+  function readStore(key) {
+    try { return JSON.parse(localStorage.getItem(PREFIX + key)); } catch (e) { return null; }
+  }
+  function writeStore(key, data) {
+    try { localStorage.setItem(PREFIX + key, JSON.stringify({ t: Date.now(), data: data })); } catch (e) {}
+  }
+
+  function jsonp(url, ms) {
+    return new Promise(function (resolve, reject) {
+      const cb = '__hb_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      const s  = document.createElement('script');
+      const timer = setTimeout(function () { done(); const e = new Error('Zeitüberschreitung'); e.retry = true; reject(e); }, ms);
+      function done() { clearTimeout(timer); window[cb] = function () {}; s.remove(); }
+      window[cb] = function (data) {
+        done();
+        if (Array.isArray(data)) resolve(data);
+        else reject(new Error('Sheet-Fehler: ' + ((data && data.error) || 'unerwartete Antwort')));
+      };
+      s.onerror = function () { done(); const e = new Error('Keine Verbindung'); e.retry = true; reject(e); };
+      s.src = url + (url.indexOf('?') < 0 ? '?' : '&') + 'callback=' + cb;
+      document.head.appendChild(s);
+    });
+  }
+
+  /* Holt eine Quelle – einmal pro Seitenaufruf, außer force=true. */
+  function get(key, url, force) {
+    const L = live[key] || (live[key] = {});
+    if (L.promise && !force) return L.promise;
+    if (!url) return Promise.reject(new Error('Keine Sheet-URL hinterlegt'));
+    const p = jsonp(url, 20000).catch(function (e) {
+      if (e.retry) return jsonp(url, 30000);      // zweiter Versuch, etwas mehr Geduld
+      throw e;
+    }).then(function (d) {
+      L.data = d; L.t = Date.now(); writeStore(key, d);
+      return d;
+    });
+    L.promise = p;
+    p.catch(function () { if (L.promise === p) L.promise = null; });   // nach Fehler darf neu versucht werden
+    return p;
+  }
+
+  /* Bester bekannter Stand ohne zu warten: frisch geladen oder aus dem Browser. */
+  function cached(key) {
+    const L = live[key];
+    if (L && L.data) return { data: L.data, t: L.t, fresh: true };
+    const st = readStore(key);
+    return (st && Array.isArray(st.data)) ? { data: st.data, t: st.t, fresh: false } : null;
+  }
+
+  function stamp(t) {
+    return new Date(t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+
+  /* Externe Skripte genau einmal laden (d3, topojson, airports.js). */
+  function script(src) {
+    if (scripts[src]) return scripts[src];
+    return (scripts[src] = new Promise(function (res) {
+      const s = document.createElement('script');
+      s.src = src; s.async = true; s.onload = res; s.onerror = res;
+      document.head.appendChild(s);
+    }));
+  }
+
+  return { get: get, cached: cached, stamp: stamp, script: script };
+})();
+</script>
+<script>
 (function () {
   'use strict';
 
@@ -1510,19 +1594,19 @@ h1:hover {
     if (el && name !== 'landing') el.scrollTop = 0;
 
     /* Lazy-load Hubs iframe */
-    if (name === 'hubs' && !hubMapInited) {
+    if (name === 'hubs' && !hubMapInited && typeof initHubMap === 'function') {
       hubMapInited = true;
-      if (typeof initHubMap === 'function') initHubMap();
+      initHubMap();
     }
 
     /* Lazy-init Statistiken-Dashboard */
-    if (name === 'statistiken' && !statsDashInited) {
+    if (name === 'statistiken' && !statsDashInited && typeof initStatsDashboard === 'function') {
       statsDashInited = true;
-      if (typeof initStatsDashboard === 'function') initStatsDashboard();
+      initStatsDashboard();
     }
   };
 
-  /* ── Hubs: Seitenmenü "Freie Hubs" / "Aktueller Stand" ── */
+  /* ── Hubs: Seitenmenü "Freie Hubs" / "Belegte Hubs" ── */
   const HUB_VIEWS = { frei: 'hv-frei', stand: 'hv-stand' };
   document.querySelectorAll('.cr-nav-item[data-hubview]').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -1534,9 +1618,9 @@ h1:hover {
       document.getElementById('hubTopbarSection').textContent = v === 'frei' ? 'Freie Hubs' : 'Belegte Hubs';
       /* Die Karte "Belegte Hubs" erst beim ersten Öffnen aufbauen –
          im versteckten Zustand hätte sie keine Größe. */
-      if (v === 'stand' && !statsMapInited) {
+      if (v === 'stand' && !statsMapInited && typeof initStatsMap === 'function') {
         statsMapInited = true;
-        if (typeof initStatsMap === 'function') initStatsMap();
+        initStatsMap();
       }
       /* sichtbar gewordene Karte an die Fläche anpassen */
       window.dispatchEvent(new Event('resize'));
@@ -1931,68 +2015,56 @@ h1:hover {
     badge.className = 'cr-source-badge live';
   }
 
-  document.getElementById('moRefreshBtn').addEventListener('click', loadCredits);
+  document.getElementById('moRefreshBtn').addEventListener('click', function () { loadCredits(true); });
   moSetNote();   /* Annahmen stehen sofort da, auch vor dem ersten Datensatz */
 
-  function loadCredits() {
+  function crBadges(text, live) {
+    ['crSourceBadge', 'moSourceBadge'].forEach(function (id) {
+      const b = document.getElementById(id);
+      b.textContent = text; b.className = 'cr-source-badge' + (live ? ' live' : '');
+    });
+  }
+  /* Daten anzeigen; staleT = Zeitpunkt eines gespeicherten Stands (sonst live) */
+  function applyCredits(data, staleT) {
+    crRows = data;
+    renderTable(data);
+    renderMonate(data);
+    if (data.length) crBadges(staleT ? 'Stand ' + HB.stamp(staleT) : 'Live', !staleT);
+  }
+
+  function loadCredits(force) {
     const btn = document.getElementById('crRefreshBtn');
-    btn.classList.add('spinning');
     if (!CR_CONFIG.SHEET_URL) {
       clearStats();
       crMessage('crTableBody', 'crSourceBadge', 'Keine Sheet-URL hinterlegt (CR_CONFIG.SHEET_URL).', true);
       moClear('Keine Sheet-URL hinterlegt (CR_CONFIG.SHEET_URL).', true);
-      btn.classList.remove('spinning');
       return;
     }
-    /* Beim Aktualisieren die bereits sichtbaren Zahlen stehen lassen –
-       die Lademeldung nur zeigen, wenn noch gar nichts da ist. */
+    /* Letzten bekannten Stand sofort zeigen – das Neuladen läuft im Hintergrund. */
+    const c = HB.cached('credits');
+    if (!crRows && c) applyCredits(c.data, c.fresh ? null : c.t);
     if (!crRows) {
       crMessage('crTableBody', 'crSourceBadge', 'Lade Daten aus dem Sheet …', false);
       crMessage('moTableBody', 'moSourceBadge', 'Lade Daten aus dem Sheet …', false);
+      crBadges('Lädt …', false);
     }
-    document.getElementById('crSourceBadge').textContent = 'Lädt …';
-    document.getElementById('moSourceBadge').textContent = 'Lädt …';
-    const cb = '__crCB_' + Date.now();
-    const timer = setTimeout(() => {
-      delete window[cb];
-      clearStats();
-      crMessage('crTableBody', 'crSourceBadge', 'Zeitüberschreitung – Sheet nicht erreichbar.', true);
-      moClear('Zeitüberschreitung – Sheet nicht erreichbar.', true);
-      btn.classList.remove('spinning');
-    }, CR_TIMEOUT);
-    window[cb] = function(data) {
-      clearTimeout(timer); delete window[cb];
-      document.getElementById('jsonpCr')?.remove();
-      if (!Array.isArray(data)) {
-        /* Das Skript liefert bei Problemen { error: ... } statt einer Liste. */
+    btn.classList.add('spinning');
+    HB.get('credits', CR_CONFIG.SHEET_URL + '?action=credits', force === true).then(function (data) {
+      applyCredits(data, null);
+    }).catch(function (err) {
+      if (crRows) {
+        /* Gespeicherter Stand bleibt sichtbar – nur ehrlich kennzeichnen. */
+        const st = HB.cached('credits');
+        crBadges(st ? 'Stand ' + HB.stamp(st.t) + ' · ' + err.message : err.message, false);
+      } else {
         clearStats();
-        crMessage('crTableBody', 'crSourceBadge',
-          'Sheet-Fehler: ' + ((data && data.error) || 'unerwartete Antwort'), true);
-        btn.classList.remove('spinning');
-        return;
+        crMessage('crTableBody', 'crSourceBadge', err.message + ' – Sheet nicht erreichbar.', true);
+        moClear(err.message + ' – Sheet nicht erreichbar.', true);
       }
-      crRows = data;
-      renderTable(data);
-      renderMonate(data);
-      if (data.length) {
-        const badge = document.getElementById('crSourceBadge');
-        badge.textContent = 'Live'; badge.className = 'cr-source-badge live';
-      }
-      btn.classList.remove('spinning');
-    };
-    const s  = document.createElement('script'); s.id = 'jsonpCr';
-    s.src    = CR_CONFIG.SHEET_URL + '?action=credits&callback=' + cb;
-    s.onerror = () => {
-      clearTimeout(timer); delete window[cb];
-      clearStats();
-      crMessage('crTableBody', 'crSourceBadge', 'Sheet nicht erreichbar – Verbindung prüfen.', true);
-      moClear('Sheet nicht erreichbar – Verbindung prüfen.', true);
-      btn.classList.remove('spinning');
-    };
-    document.head.appendChild(s);
+    }).then(function () { btn.classList.remove('spinning'); });
   }
 
-  document.getElementById('crRefreshBtn').addEventListener('click', loadCredits);
+  document.getElementById('crRefreshBtn').addEventListener('click', function () { loadCredits(true); });
 
   /* ── Ehemalige Spieler ── */
   let ehemaligeLoaded = false;
@@ -2017,54 +2089,46 @@ h1:hover {
     ehemaligeLoaded = true;
   }
 
-  function loadEhemalige() {
+  function applyEhemalige(data, staleT) {
+    const badge = document.getElementById('ehSourceBadge');
+    if (!data.length) {
+      crMessage('ehemaligeBody', 'ehSourceBadge', 'Keine ehemaligen Spieler vorhanden.', false);
+    } else {
+      renderEhemalige(data);
+    }
+    badge.textContent = staleT ? 'Stand ' + HB.stamp(staleT) : (data.length ? 'Live' : 'Keine Daten');
+    badge.className = 'cr-source-badge' + (!staleT && data.length ? ' live' : '');
+  }
+
+  function loadEhemalige(force) {
     const btn = document.getElementById('ehRefreshBtn');
-    btn.classList.add('spinning');
     if (!CR_CONFIG.SHEET_URL) {
       crMessage('ehemaligeBody', 'ehSourceBadge', 'Keine Sheet-URL hinterlegt (CR_CONFIG.SHEET_URL).', true);
-      btn.classList.remove('spinning');
       return;
     }
-    crMessage('ehemaligeBody', 'ehSourceBadge', 'Lade Daten aus dem Sheet …', false);
-    document.getElementById('ehSourceBadge').textContent = 'Lädt …';
-    const cb = '__ehCB_' + Date.now();
-    const timer = setTimeout(() => {
-      delete window[cb];
-      crMessage('ehemaligeBody', 'ehSourceBadge', 'Zeitüberschreitung – Sheet nicht erreichbar.', true);
-      btn.classList.remove('spinning');
-    }, CR_TIMEOUT);
-    window[cb] = function(data) {
-      clearTimeout(timer); delete window[cb];
-      document.getElementById('jsonpEh')?.remove();
-      if (!Array.isArray(data)) {
-        crMessage('ehemaligeBody', 'ehSourceBadge',
-          'Sheet-Fehler: ' + ((data && data.error) || 'unerwartete Antwort'), true);
-        btn.classList.remove('spinning');
-        return;
-      }
-      if (!data.length) {
-        /* Gueltige, aber leere Antwort: Verbindung stand, es gibt nur nichts. */
-        crMessage('ehemaligeBody', 'ehSourceBadge', 'Keine ehemaligen Spieler vorhanden.', false);
+    let shown = false;
+    const c = HB.cached('ehemalige');
+    if (c) { applyEhemalige(c.data, c.fresh ? null : c.t); shown = true; }
+    else {
+      crMessage('ehemaligeBody', 'ehSourceBadge', 'Lade Daten aus dem Sheet …', false);
+      document.getElementById('ehSourceBadge').textContent = 'Lädt …';
+    }
+    btn.classList.add('spinning');
+    HB.get('ehemalige', CR_CONFIG.SHEET_URL + '?action=ehemalige', force === true).then(function (data) {
+      applyEhemalige(data, null);
+    }).catch(function (err) {
+      if (shown) {
+        const b = document.getElementById('ehSourceBadge');
+        b.textContent = 'Stand ' + HB.stamp(c.t) + ' · ' + err.message; b.className = 'cr-source-badge';
       } else {
-        renderEhemalige(data);
-        const badge = document.getElementById('ehSourceBadge');
-        badge.textContent = 'Live'; badge.className = 'cr-source-badge live';
+        crMessage('ehemaligeBody', 'ehSourceBadge', err.message + ' – Sheet nicht erreichbar.', true);
       }
-      btn.classList.remove('spinning');
-    };
-    const s = document.createElement('script'); s.id = 'jsonpEh';
-    s.src    = CR_CONFIG.SHEET_URL + '?action=ehemalige&callback=' + cb;
-    s.onerror = () => {
-      clearTimeout(timer); delete window[cb];
-      crMessage('ehemaligeBody', 'ehSourceBadge', 'Sheet nicht erreichbar – Verbindung prüfen.', true);
-      btn.classList.remove('spinning');
-    };
-    document.head.appendChild(s);
+    }).then(function () { btn.classList.remove('spinning'); });
   }
 
   document.getElementById('ehRefreshBtn').addEventListener('click', () => {
     ehemaligeLoaded = false;
-    loadEhemalige();
+    loadEhemalige(true);
   });
 
   /* Credits sidebar: collapse */
@@ -2409,6 +2473,8 @@ h1:hover {
   syncCount();
   if (REDUCED) drawStatic(); else start();
   loadCredits();
+  /* "Ehemalige" schon jetzt vorladen, damit die Ansicht sofort da ist */
+  if (CR_CONFIG.SHEET_URL) HB.get('ehemalige', CR_CONFIG.SHEET_URL + '?action=ehemalige').catch(function () {});
 
 }());
 </script>
@@ -2421,6 +2487,9 @@ h1:hover {
 /* Wird beim Deploy aus dem GitHub-Secret STATS_URL ersetzt. */
 const ST_URL = '__STATS_URL__';
 const ST_CONFIG = { SHEET_URL: ST_URL.slice(0, 2) === '__' ? '' : ST_URL };
+/* Eine Abfrage für Dashboard, "Belegte Hubs" und "Freie Hubs":
+   alle=1 liefert auch Airlines unter 3 Stationen – jede Ansicht filtert selbst. */
+function hbUnternehmenUrl() { return ST_CONFIG.SHEET_URL ? ST_CONFIG.SHEET_URL + '?action=unternehmen&alle=1' : ''; }
 
 
 /* ── Haupt-Funktion ── */
@@ -2433,24 +2502,12 @@ window.initStatsMap = function () {
   const legend  = document.getElementById('statsLegendCount');
   const content = document.getElementById('spContent');
 
-  /* Laedt d3, topojson und den Flughafen-Datensatz erst hier –
-     zusammen ~900 KB, die die Landingpage sonst beim Start blockieren. */
-  function loadOnce(src) {
-    return new Promise(function (res) {
-      const s = document.createElement('script');
-      s.src = src;
-      s.async = true;
-      s.onload = res;
-      s.onerror = res;
-      document.head.appendChild(s);
-    });
-  }
 
   function ensureDeps(cb) {
     const jobs = [];
-    if (!window.AIRPORTS || !window.AIRPORTS.length) jobs.push(loadOnce('airports.js'));
-    if (typeof window.d3 === 'undefined')            jobs.push(loadOnce('https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js'));
-    if (typeof window.topojson === 'undefined')      jobs.push(loadOnce('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js'));
+    if (!window.AIRPORTS || !window.AIRPORTS.length) jobs.push(HB.script('airports.js'));
+    if (typeof window.d3 === 'undefined')            jobs.push(HB.script('https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js'));
+    if (typeof window.topojson === 'undefined')      jobs.push(HB.script('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js'));
     Promise.all(jobs).then(function () {
       if (typeof window.d3 === 'undefined') {
         if (loading) loading.textContent = 'Karte konnte nicht geladen werden.';
@@ -2702,34 +2759,19 @@ window.initStatsMap = function () {
       badge.className = 'stats-badge' + (live ? ' live' : '');
     }
 
-    function loadLiveData(attempt) {
-      attempt = attempt || 1;
+    function applyStand(raw, staleT) {
+      currentData = raw.filter(function(r){ return (Number(r.stations)||0) >= 3 && r.hqCode; });
+      ranks = computeRanks(currentData);
+      redrawDots();
+      if (!currentData.length) setBadge('Keine Daten', false);
+      else setBadge(staleT ? 'Stand ' + HB.stamp(staleT) : 'Live', !staleT);
+    }
+    function loadLiveData() {
       if (!ST_CONFIG.SHEET_URL) { setBadge('Keine Sheet-URL', false); redrawDots(); return; }
-      setBadge(attempt > 1 ? 'Lädt (2. Versuch) …' : 'Lädt …', false);
-      const cb = '__stCB_' + Date.now();
-      /* Apps Script braucht beim Kaltstart oft deutlich mehr als 9 s.
-         Diese Karte hat keinen Aktualisieren-Knopf – daher einmal selbst neu versuchen. */
-      const timer = setTimeout(function(){
-        delete window[cb];
-        const el = document.getElementById('jsonpSt'); if (el) el.parentNode.removeChild(el);
-        if (attempt < 2) loadLiveData(attempt + 1); else setBadge('Zeitüberschreitung', false);
-      }, 25000);
-      window[cb] = function(raw) {
-        clearTimeout(timer); delete window[cb];
-        const el=document.getElementById('jsonpSt');
-        if(el) el.parentNode.removeChild(el);
-        if (!Array.isArray(raw)) { setBadge('Sheet-Fehler', false); return; }
-        /* Das Backend filtert schon – hier nur zur Sicherheit erneut. */
-        currentData = raw.filter(function(r){ return (r.stations||0) >= 3 && r.hqCode; });
-        ranks = computeRanks(currentData);
-        redrawDots();
-        setBadge(currentData.length ? 'Live' : 'Keine Daten', currentData.length > 0);
-      };
-      const s = document.createElement('script');
-      s.id = 'jsonpSt';
-      s.src = ST_CONFIG.SHEET_URL + '?action=unternehmen&callback=' + cb;
-      s.onerror = function(){ clearTimeout(timer); delete window[cb]; setBadge('Keine Verbindung', false); };
-      document.head.appendChild(s);
+      const c = HB.cached('unternehmen');
+      if (c) applyStand(c.data, c.fresh ? null : c.t); else setBadge('Lädt …', false);
+      HB.get('unternehmen', hbUnternehmenUrl()).then(function (raw) { applyStand(raw, null); })
+        .catch(function (err) { setBadge(c ? 'Stand ' + HB.stamp(c.t) + ' · ' + err.message : err.message, false); });
     }
   });
 };
@@ -2773,39 +2815,29 @@ window.initHubMap = function () {
     badge.textContent = text;
     badge.className = 'stats-badge' + (live ? ' live' : '');
   }
-  function loadOnce(src) {
-    return new Promise(function (res) {
-      const s = document.createElement('script');
-      s.src = src; s.async = true; s.onload = res; s.onerror = res;
-      document.head.appendChild(s);
-    });
-  }
 
   /* Belegte Hauptsitze live holen. alle=1: auch Airlines unter 3 Stationen –
      eine frisch gegründete Airline belegt ihren Hub genauso. */
   function loadTaken() {
-    return new Promise(function (resolve, reject) {
-      const url = (typeof ST_CONFIG !== 'undefined') ? ST_CONFIG.SHEET_URL : '';
-      if (!url) { reject(new Error('Keine Sheet-URL hinterlegt')); return; }
-      const cb = '__hubCB_' + Date.now();
-      const s  = document.createElement('script');
-      const timer = setTimeout(function () { cleanup(); reject(new Error('Zeitüberschreitung')); }, 25000);
-      function cleanup() { clearTimeout(timer); delete window[cb]; s.remove(); }
-      window[cb] = function (raw) {
-        cleanup();
-        if (!Array.isArray(raw)) reject(new Error('Sheet-Fehler'));
-        else resolve(raw.filter(function (r) { return r && r.name && r.hqCode; }));
-      };
-      s.onerror = function () { cleanup(); reject(new Error('Keine Verbindung')); };
-      s.src = url + '?action=unternehmen&alle=1&callback=' + cb;
-      document.head.appendChild(s);
-    });
+    const keep = function (raw) { return raw.filter(function (r) { return r && r.name && r.hqCode; }); };
+    if (!ST_CONFIG.SHEET_URL) return Promise.reject(new Error('Keine Sheet-URL hinterlegt'));
+    const c = HB.cached('unternehmen');
+    const fresh = HB.get('unternehmen', hbUnternehmenUrl());
+    if (c) {
+      /* Sofort mit dem letzten Stand zeichnen, frische Daten danach nachreichen. */
+      fresh.then(function (raw) { freshArrived = true; staleT = null; taken = keep(raw); setBadge('Live', true); render(); })
+           .catch(function (err) { setBadge('Stand ' + HB.stamp(c.t) + ' · ' + err.message, false); });
+      staleT = c.fresh ? null : c.t;
+      return Promise.resolve(keep(c.data));
+    }
+    return fresh.then(keep);
   }
+  let staleT = null, freshArrived = false;
 
   const jobs = [];
-  if (!window.AIRPORTS || !window.AIRPORTS.length) jobs.push(loadOnce('airports.js'));
-  if (typeof window.d3 === 'undefined')            jobs.push(loadOnce('https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js'));
-  if (typeof window.topojson === 'undefined')      jobs.push(loadOnce('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js'));
+  if (!window.AIRPORTS || !window.AIRPORTS.length) jobs.push(HB.script('airports.js'));
+  if (typeof window.d3 === 'undefined')            jobs.push(HB.script('https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js'));
+  if (typeof window.topojson === 'undefined')      jobs.push(HB.script('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js'));
 
   Promise.all(jobs).then(function () {
     if (typeof window.d3 === 'undefined') { loadTxt.textContent = 'Karte konnte nicht geladen werden.'; return; }
@@ -3021,9 +3053,9 @@ window.initHubMap = function () {
       fit();
       return loadTaken();
     }).then(function (rows) {
-      taken = rows;
+      if (!freshArrived) taken = rows;      /* frische Daten nie durch den alten Stand ersetzen */
       loading.classList.add('hidden');
-      setBadge('Live', true);
+      setBadge(staleT ? 'Stand ' + HB.stamp(staleT) : 'Live', !staleT);
       render();
     }).catch(function (err) {
       /* Ohne Belegung lässt sich nicht sagen, was frei ist – lieber
@@ -3107,7 +3139,7 @@ window.initStatsDashboard = function () {
     render();
   });
   $('dbAirMore').addEventListener('click', function () { showAll = !showAll; renderAirlines(); });
-  $('dbRefreshBtn').addEventListener('click', load);
+  $('dbRefreshBtn').addEventListener('click', function () { load(true); });
 
   /* ── Bausteine ── */
   function barRow(lbl, sub, segs, max, valueText, rank) {
@@ -3303,35 +3335,31 @@ window.initStatsDashboard = function () {
   }
 
   /* ── Daten ── */
-  let loading = false;
-  function load() {
-    if (loading) return;
-    const url = (typeof ST_CONFIG !== 'undefined') ? ST_CONFIG.SHEET_URL : '';
-    if (!url) { badge('Keine Sheet-URL', false); showEmpty('Keine Sheet-URL hinterlegt.'); return; }
-    loading = true;
+  function apply(raw, staleT) {
+    data = raw.filter(function (r) { return r && r.name && (Number(r.stations) || 0) >= 3; }).map(function (r) {
+      return Object.assign({}, r, { passagiere: Number(r.passagiere) || 0, fracht: Number(r.fracht) || 0,
+                                    flotte: Number(r.flotte) || 0, stations: Number(r.stations) || 0 });
+    });
+    if (!data.length) { badge('Keine Daten', false); showEmpty('Keine Airlines im Sheet.'); return; }
+    badge(staleT ? 'Stand ' + HB.stamp(staleT) : 'Live', !staleT);
+    $('dbFoot').textContent = 'Quelle: Unternehmen-Sheet (Scraper) · ' + data.length + ' Airlines ab 3 Stationen · ' +
+      (staleT ? 'gespeicherter Stand vom ' : 'Stand ') +
+      new Date(staleT || Date.now()).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) + '.';
+    render();
+  }
+
+  function load(force) {
+    if (!ST_CONFIG.SHEET_URL) { badge('Keine Sheet-URL', false); showEmpty('Keine Sheet-URL hinterlegt.'); return; }
+    const c = HB.cached('unternehmen');
+    if (!data.length && c) apply(c.data, c.fresh ? null : c.t);
+    if (!data.length) { badge('Lädt …', false); showEmpty('Lade Daten aus dem Sheet …'); }
     $('dbRefreshBtn').classList.add('spinning');
-    badge('Lädt …', false);
-    if (!data.length) showEmpty('Lade Daten aus dem Sheet …');
-    const cb = '__dbCB_' + Date.now();
-    const s  = document.createElement('script');
-    function done() { loading = false; $('dbRefreshBtn').classList.remove('spinning'); clearTimeout(timer); delete window[cb]; s.remove(); }
-    const timer = setTimeout(function () { done(); badge('Zeitüberschreitung', false); if (!data.length) showEmpty('Zeitüberschreitung – Sheet nicht erreichbar.'); }, 25000);
-    window[cb] = function (raw) {
-      done();
-      if (!Array.isArray(raw)) { badge('Sheet-Fehler', false); if (!data.length) showEmpty('Sheet-Fehler: ' + ((raw && raw.error) || 'unerwartete Antwort')); return; }
-      data = raw.filter(function (r) { return r && r.name && (Number(r.stations) || 0) >= 3; }).map(function (r) {
-        return Object.assign({}, r, { passagiere: Number(r.passagiere) || 0, fracht: Number(r.fracht) || 0,
-                                      flotte: Number(r.flotte) || 0, stations: Number(r.stations) || 0 });
-      });
-      badge(data.length ? 'Live' : 'Keine Daten', data.length > 0);
-      if (!data.length) { showEmpty('Keine Airlines im Sheet.'); return; }
-      $('dbFoot').textContent = 'Quelle: Unternehmen-Sheet (Scraper) · ' + data.length + ' Airlines ab 3 Stationen · Stand ' +
-        new Date().toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) + '.';
-      render();
-    };
-    s.onerror = function () { done(); badge('Keine Verbindung', false); if (!data.length) showEmpty('Sheet nicht erreichbar – Verbindung prüfen.'); };
-    s.src = url + '?action=unternehmen&callback=' + cb;
-    document.head.appendChild(s);
+    HB.get('unternehmen', hbUnternehmenUrl(), force === true).then(function (raw) { apply(raw, null); })
+      .catch(function (err) {
+        if (data.length) badge((c ? 'Stand ' + HB.stamp(c.t) + ' · ' : '') + err.message, false);
+        else { badge(err.message, false); showEmpty(err.message + ' – Sheet nicht erreichbar.'); }
+      })
+      .then(function () { $('dbRefreshBtn').classList.remove('spinning'); });
   }
 
   /* Flughafendaten für die Regionen nachladen (dieselbe Datei wie die Karten) */
@@ -3341,14 +3369,38 @@ window.initStatsDashboard = function () {
     if (data.length) renderRegions();
   }
   if (window.AIRPORTS && window.AIRPORTS.length) withAirports();
-  else {
-    const s = document.createElement('script');
-    s.src = 'airports.js'; s.async = true; s.onload = withAirports;
-    document.head.appendChild(s);
-  }
+  else HB.script('airports.js').then(withAirports);
 
   load();
 };
+</script>
+
+
+<script>
+/* ══════════════════════════════════════════
+   VORLADEN: Sobald die Startseite steht, holen wir die Unternehmensdaten
+   (Credits laufen schon) und – im Leerlauf – die Kartendaten. Beim
+   Öffnen einer Unterseite ist dann meist alles schon da.
+══════════════════════════════════════════ */
+window.addEventListener('load', function () {
+  /* Wurde eine Unterseite geöffnet, bevor alle Skripte da waren, jetzt nachholen. */
+  const t = (document.getElementById('mapWorld').style.transform || '');
+  if (t.indexOf('100vw, 0') >= 0 && t.indexOf('-100vw') < 0) navigateTo('statistiken');
+  else if (t.indexOf('-100vh') >= 0) navigateTo('hubs');
+
+  if (ST_CONFIG.SHEET_URL) HB.get('unternehmen', hbUnternehmenUrl()).catch(function () {});
+
+  const idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 1500); };
+  setTimeout(function () {
+    idle(function () {
+      HB.script('https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js');
+      HB.script('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js');
+      /* Weltkarte nur in den Browser-Cache holen; d3.json bedient sich später daraus */
+      try { fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').catch(function () {}); } catch (e) {}
+      idle(function () { HB.script('airports.js'); });   // 600 KB – als Letztes
+    }, { timeout: 4000 });
+  }, 2000);
+});
 </script>
 
 </body>
