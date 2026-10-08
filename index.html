@@ -1321,7 +1321,7 @@ h1:hover {
             </button>
             <button class="cr-nav-item" data-hubview="stand">
               <span class="ni-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>
-              <span class="ni-label">Aktueller Stand</span>
+              <span class="ni-label">Belegte Hubs</span>
             </button>
           </div>
         </div>
@@ -1531,8 +1531,8 @@ h1:hover {
       Object.keys(HUB_VIEWS).forEach(function (k) {
         document.getElementById(HUB_VIEWS[k]).classList.toggle('active', k === v);
       });
-      document.getElementById('hubTopbarSection').textContent = v === 'frei' ? 'Freie Hubs' : 'Aktueller Stand';
-      /* Die Karte "Aktueller Stand" erst beim ersten Öffnen aufbauen –
+      document.getElementById('hubTopbarSection').textContent = v === 'frei' ? 'Freie Hubs' : 'Belegte Hubs';
+      /* Die Karte "Belegte Hubs" erst beim ersten Öffnen aufbauen –
          im versteckten Zustand hätte sie keine Größe. */
       if (v === 'stand' && !statsMapInited) {
         statsMapInited = true;
