@@ -644,6 +644,10 @@ h1:hover {
 ══════════════════════════════════════════ */
 #p-hubs { display: flex; flex-direction: column; }
 #p-hubs .panel-topbar { flex-shrink: 0; }
+.hub-layout  { height: calc(100vh - 56px); min-height: 0; }
+.hub-views   { flex: 1; position: relative; min-width: 0; }
+.hub-view    { position: absolute; inset: 0; display: none; flex-direction: column; }
+.hub-view.active { display: flex; }
 #hubMapWrap { flex: 1; position: relative; overflow: hidden; }
 #hubMap { width: 100%; height: 100%; display: block; cursor: grab; }
 #hubMap:active { cursor: grabbing; }
@@ -729,7 +733,7 @@ h1:hover {
 /* ══════════════════════════════════════════
    PANEL 3 – STATISTIKEN MAP
 ══════════════════════════════════════════ */
-#p-statistiken { display: flex; flex-direction: column; }
+#p-statistiken { display: block; }
 #statsMapWrap {
   flex: 1;
   position: relative;
@@ -909,6 +913,96 @@ h1:hover {
 @media (prefers-reduced-motion: reduce) {
   .map-world { transition: none; }
   .stage, .nav-card, .cr-stat, .cr-table-wrap, .cr-table tbody tr { animation: none; }
+}
+
+/* ══════════════════════════════════════════
+   STATISTIKEN – DASHBOARD
+   Datenfarben gegen die Fläche #0c1150 geprüft
+   (Farbenblindheit, Kontrast, Helligkeitsband):
+   Reihe 1 #1fa890 · Reihe 2 #9B5DE5 · Reihe 3 #dd6a2e
+══════════════════════════════════════════ */
+.db {
+  --db-surface: #0c1150;
+  --db-s1: #1fa890; --db-s2: #9B5DE5; --db-s3: #dd6a2e;
+  --db-muted-mark: #3a4290;
+  --db-ink: rgba(255,255,255,.92); --db-ink2: rgba(255,255,255,.6); --db-ink3: rgba(255,255,255,.38);
+  --db-grid: rgba(255,255,255,.07);
+  max-width: 1280px; margin: 0 auto; padding: 28px 30px 60px;
+}
+.db-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+@media (max-width: 1100px) { .db-kpis { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px)  { .db-kpis { grid-template-columns: repeat(2, 1fr); } }
+.db-kpi { background: var(--db-surface); border: 1px solid rgba(255,255,255,.07); border-radius: 15px; padding: 15px 17px;
+  animation: fadeUp .55s cubic-bezier(.16,1,.3,1) both; }
+.db-kpi-lbl { font-size: .62rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--db-ink3); margin-bottom: 7px; }
+.db-kpi-val { font: 900 1.7rem/1 'Nunito', sans-serif; color: var(--db-ink); }
+.db-kpi-sub { font-size: .68rem; color: var(--db-ink3); margin-top: 5px; }
+
+.db-filter { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.db-filter-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--db-ink3); }
+.db-seg { display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--db-surface); border: 1px solid rgba(255,255,255,.08); border-radius: 11px; }
+.db-seg button { border: 0; background: none; color: var(--db-ink2); font: 600 .78rem 'DM Sans', system-ui, sans-serif;
+  padding: 7px 13px; border-radius: 8px; cursor: pointer; transition: background .15s, color .15s; }
+.db-seg button:hover { color: #fff; }
+.db-seg button.active { background: #2DCFB3; color: #071040; }
+
+.db-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .db-grid { grid-template-columns: 1fr; } }
+.db-card { background: var(--db-surface); border: 1px solid rgba(255,255,255,.07); border-radius: 18px; padding: 18px 20px 16px; min-width: 0;
+  animation: fadeUp .55s cubic-bezier(.16,1,.3,1) .12s both; }
+.db-wide { grid-column: 1 / -1; }
+.db-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.db-card-head h3 { font: 800 1rem 'Nunito', sans-serif; color: var(--db-ink); }
+.db-card-sub { font-size: .72rem; color: var(--db-ink3); margin-top: 2px; }
+.db-more { border: 1px solid rgba(255,255,255,.12); background: none; color: var(--db-ink2); font: 600 .72rem 'DM Sans', sans-serif;
+  padding: 6px 11px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+.db-more:hover { color: #fff; border-color: rgba(255,255,255,.3); }
+
+/* Balkenreihen: Name | Balken | Wert */
+.db-bars { display: flex; flex-direction: column; gap: 7px; }
+.db-row { display: grid; grid-template-columns: minmax(110px, 30%) 1fr; align-items: center; gap: 12px; font-size: .78rem; }
+.db-row-lbl { min-width: 0; }
+.db-row-name { color: var(--db-ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.db-row-sub  { color: var(--db-ink3); font-size: .66rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.db-track { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 92px; }  /* Platz für die Zahl an der Balkenspitze */
+.db-bar { display: flex; flex-shrink: 0; height: 14px; min-width: 2px; transition: width .5s cubic-bezier(.16,1,.3,1); }
+.db-val { flex: none; }
+.db-seg-fill { height: 100%; background: var(--db-s1); margin-right: 2px; }           /* 2px Flächenlücke zwischen Segmenten */
+.db-seg-fill:last-child { margin-right: 0; border-radius: 0 4px 4px 0; }           /* runde Datenkante, gerade an der Basis */
+.db-seg-fill:hover, .db-bar.single:hover .db-seg-fill { filter: brightness(1.25); }
+.db-val { color: var(--db-ink2); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: .74rem; }
+.db-rank { display: inline-block; width: 22px; color: var(--db-ink3); font-variant-numeric: tabular-nums; }
+.db-ally { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--db-s2); margin-left: 6px; vertical-align: middle; }
+
+/* Allianzen: 100-%-Balken */
+.db-share { margin-bottom: 14px; }
+.db-share-head { display: flex; justify-content: space-between; font-size: .74rem; color: var(--db-ink2); margin-bottom: 6px; }
+.db-share-bar { display: flex; height: 16px; }
+.db-share-bar i { height: 100%; margin-right: 2px; }
+.db-share-bar i:first-child { border-radius: 4px 0 0 4px; }
+.db-share-bar i:last-child  { margin-right: 0; border-radius: 0 4px 4px 0; }
+.db-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .72rem; color: var(--db-ink2); margin: 2px 0 14px; }
+.db-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.db-legend i { width: 10px; height: 10px; border-radius: 3px; }
+.db-note { font-size: .74rem; color: var(--db-ink2); line-height: 1.55; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.04); }
+.db-note b { color: var(--db-ink); }
+
+.db-table th { cursor: pointer; user-select: none; white-space: nowrap; }
+.db-table th.sorted { color: #2DCFB3; }
+.db-table td.num, .db-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.db-table { min-width: 860px; }
+.db-foot { font-size: .7rem; color: var(--db-ink3); margin-top: 16px; line-height: 1.5; }
+.db-empty { font-size: .8rem; color: var(--db-ink3); padding: 18px 0; text-align: center; }
+
+.db-tip {
+  position: fixed; z-index: 400; pointer-events: none; opacity: 0; transition: opacity .1s;
+  background: #050833; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; padding: 8px 11px;
+  font-size: .74rem; color: rgba(255,255,255,.85); white-space: pre-line; max-width: 260px; box-shadow: 0 8px 24px rgba(0,0,0,.45);
+}
+.db-tip.on { opacity: 1; }
+@media (max-width: 600px) {
+  .db { padding: 18px 14px 50px; }
+  .db-row { grid-template-columns: minmax(90px, 36%) 1fr; }
 }
 </style>
 <!-- d3, topojson und airports.js (zusammen ~900 KB) blockierten hier das
@@ -1207,37 +1301,92 @@ h1:hover {
       <div class="topbar-brand">
         <span class="topbar-hindenburg">Hindenburg</span>
         <span class="topbar-sep">·</span>
-        <span class="topbar-section">Hubs</span>
+        <span class="topbar-section" id="hubTopbarSection">Freie Hubs</span>
       </div>
+      <button class="mobile-menu-btn" id="hubMobileMenuBtn" aria-label="Navigation">
+        <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
     </header>
-    <div id="hubMapWrap">
-      <div id="hubLoading" class="stats-loading">
-        <svg class="spin-icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-        <span id="hubLoadingText">Karte wird geladen…</span>
-      </div>
-      <svg id="hubMap"></svg>
-
-      <div class="hub-toggle" role="tablist" aria-label="Ansicht">
-        <button class="hub-tg active" data-view="airports" role="tab" aria-selected="true">Flughäfen</button>
-        <button class="hub-tg" data-view="countries" role="tab" aria-selected="false">Länder</button>
-      </div>
-
-      <div id="hubPopup">
-        <button id="hubPopupClose" aria-label="Schließen">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    <div class="cr-layout hub-layout">
+      <aside class="cr-sidebar" id="hubSidebar">
+        <button class="cr-collapse-btn" id="hubCollapseBtn" aria-label="Einklappen">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <div id="hpContent"></div>
-      </div>
+        <div class="cr-sidebar-inner">
+          <div class="cr-nav-group">
+            <div class="cr-nav-group-label">Hubs</div>
+            <button class="cr-nav-item active" data-hubview="frei">
+              <span class="ni-icon"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+              <span class="ni-label">Freie Hubs</span>
+            </button>
+            <button class="cr-nav-item" data-hubview="stand">
+              <span class="ni-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>
+              <span class="ni-label">Aktueller Stand</span>
+            </button>
+          </div>
+        </div>
+      </aside>
 
-      <div class="hub-legend" id="hubLegend"></div>
-      <div class="stats-badge" id="hubBadge">Lädt …</div>
+      <div class="hub-views">
+        <div class="hub-view active" id="hv-frei">
+        <div id="hubMapWrap">
+          <div id="hubLoading" class="stats-loading">
+            <svg class="spin-icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            <span id="hubLoadingText">Karte wird geladen…</span>
+          </div>
+          <svg id="hubMap"></svg>
 
-      <div class="stats-ctrl">
-        <button class="s-btn" id="hZoomIn"  title="Reinzoomen">+</button>
-        <button class="s-btn" id="hZoomOut" title="Rauszoomen">−</button>
-        <button class="s-btn" id="hReset"   title="Zurücksetzen">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-        </button>
+          <div class="hub-toggle" role="tablist" aria-label="Ansicht">
+            <button class="hub-tg active" data-view="airports" role="tab" aria-selected="true">Flughäfen</button>
+            <button class="hub-tg" data-view="countries" role="tab" aria-selected="false">Länder</button>
+          </div>
+
+          <div id="hubPopup">
+            <button id="hubPopupClose" aria-label="Schließen">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <div id="hpContent"></div>
+          </div>
+
+          <div class="hub-legend" id="hubLegend"></div>
+          <div class="stats-badge" id="hubBadge">Lädt …</div>
+
+          <div class="stats-ctrl">
+            <button class="s-btn" id="hZoomIn"  title="Reinzoomen">+</button>
+            <button class="s-btn" id="hZoomOut" title="Rauszoomen">−</button>
+            <button class="s-btn" id="hReset"   title="Zurücksetzen">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </button>
+          </div>
+        </div>
+        </div>
+        <div class="hub-view" id="hv-stand">
+        <div id="statsMapWrap">
+          <div id="statsLoading" class="stats-loading">
+            <svg class="spin-icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            Karte wird geladen…
+          </div>
+          <svg id="statsMap"></svg>
+          <div id="statsPopup">
+            <button id="statsPopupClose" aria-label="Schließen">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <div id="spContent"></div>
+          </div>
+          <div class="stats-ctrl">
+            <button class="s-btn" id="sZoomIn"  title="Reinzoomen">+</button>
+            <button class="s-btn" id="sZoomOut" title="Rauszoomen">−</button>
+            <button class="s-btn" id="sReset"   title="Zurücksetzen">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </button>
+          </div>
+          <div class="stats-legend">
+            <div class="sl-dot"></div>
+            <span id="statsLegendCount">Airlines (ab 3 Stationen)</span>
+          </div>
+          <div class="stats-badge" id="statsBadge">Lädt …</div>
+        </div>
+        </div>
       </div>
     </div>
   </section>
@@ -1256,30 +1405,58 @@ h1:hover {
         <span class="topbar-section">Statistiken</span>
       </div>
     </header>
-    <div id="statsMapWrap">
-      <div id="statsLoading" class="stats-loading">
-        <svg class="spin-icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-        Karte wird geladen…
+    <div class="db" id="statsDash">
+      <div class="cr-header">
+        <h2 class="cr-title">Statistiken <em>&#183;</em> <strong>Dashboard</strong></h2>
+        <div class="cr-action-row">
+          <span class="cr-source-badge" id="dbBadge">L&#228;dt &#8230;</span>
+          <button class="btn-refresh" id="dbRefreshBtn"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Aktualisieren</button>
+        </div>
       </div>
-      <svg id="statsMap"></svg>
-      <div id="statsPopup">
-        <button id="statsPopupClose" aria-label="Schließen">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-        <div id="spContent"></div>
+
+      <div class="db-kpis" id="dbKpis"></div>
+
+      <div class="db-filter">
+        <span class="db-filter-lbl">Kennzahl</span>
+        <div class="db-seg" id="dbMetric" role="tablist" aria-label="Kennzahl"></div>
       </div>
-      <div class="stats-ctrl">
-        <button class="s-btn" id="sZoomIn"  title="Reinzoomen">+</button>
-        <button class="s-btn" id="sZoomOut" title="Rauszoomen">−</button>
-        <button class="s-btn" id="sReset"   title="Zurücksetzen">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-        </button>
+
+      <div class="db-grid">
+        <section class="db-card db-wide">
+          <header class="db-card-head">
+            <div><h3 id="dbAirTitle">Airlines</h3><p class="db-card-sub" id="dbAirSub"></p></div>
+            <button class="db-more" id="dbAirMore">Alle anzeigen</button>
+          </header>
+          <div class="db-bars" id="dbAir"></div>
+        </section>
+
+        <section class="db-card">
+          <header class="db-card-head"><div><h3>Spieler</h3><p class="db-card-sub" id="dbCeoSub"></p></div></header>
+          <div class="db-bars" id="dbCeo"></div>
+        </section>
+
+        <section class="db-card">
+          <header class="db-card-head"><div><h3>Regionen</h3><p class="db-card-sub" id="dbRegSub">nach Land des Hauptsitzes</p></div></header>
+          <div class="db-bars" id="dbReg"></div>
+        </section>
+
+        <section class="db-card">
+          <header class="db-card-head"><div><h3>Allianzen</h3><p class="db-card-sub" id="dbAllSub"></p></div></header>
+          <div id="dbAll"></div>
+        </section>
+
+        <section class="db-card">
+          <header class="db-card-head"><div><h3>Finanzrating</h3><p class="db-card-sub">Anzahl Airlines je Stufe</p></div></header>
+          <div class="db-bars" id="dbRating"></div>
+        </section>
+
+        <section class="db-card db-wide">
+          <header class="db-card-head"><div><h3>Alle Airlines</h3><p class="db-card-sub">Spaltenkopf anklicken zum Sortieren</p></div></header>
+          <div class="cr-table-scroll"><table class="cr-table db-table" id="dbTable"></table></div>
+        </section>
       </div>
-      <div class="stats-legend">
-        <div class="sl-dot"></div>
-        <span id="statsLegendCount">Airlines (ab 3 Stationen)</span>
-      </div>
-      <div class="stats-badge" id="statsBadge">Lädt …</div>
+      <p class="db-foot" id="dbFoot"></p>
+      <div class="db-tip" id="dbTip" role="tooltip"></div>
     </div>
   </section>
 
@@ -1299,6 +1476,7 @@ h1:hover {
   const mapWorld = document.getElementById('mapWorld');
   let hubMapInited     = false;
   let statsMapInited   = false;
+  let statsDashInited  = false;
 
   const PANEL_TRANSFORMS = {
     landing:     'translate(0, 0)',
@@ -1337,12 +1515,45 @@ h1:hover {
       if (typeof initHubMap === 'function') initHubMap();
     }
 
-    /* Lazy-init Statistiken map */
-    if (name === 'statistiken' && !statsMapInited) {
-      statsMapInited = true;
-      if (typeof initStatsMap === 'function') initStatsMap();
+    /* Lazy-init Statistiken-Dashboard */
+    if (name === 'statistiken' && !statsDashInited) {
+      statsDashInited = true;
+      if (typeof initStatsDashboard === 'function') initStatsDashboard();
     }
   };
+
+  /* ── Hubs: Seitenmenü "Freie Hubs" / "Aktueller Stand" ── */
+  const HUB_VIEWS = { frei: 'hv-frei', stand: 'hv-stand' };
+  document.querySelectorAll('.cr-nav-item[data-hubview]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const v = btn.dataset.hubview;
+      document.querySelectorAll('.cr-nav-item[data-hubview]').forEach(function (b) { b.classList.toggle('active', b === btn); });
+      Object.keys(HUB_VIEWS).forEach(function (k) {
+        document.getElementById(HUB_VIEWS[k]).classList.toggle('active', k === v);
+      });
+      document.getElementById('hubTopbarSection').textContent = v === 'frei' ? 'Freie Hubs' : 'Aktueller Stand';
+      /* Die Karte "Aktueller Stand" erst beim ersten Öffnen aufbauen –
+         im versteckten Zustand hätte sie keine Größe. */
+      if (v === 'stand' && !statsMapInited) {
+        statsMapInited = true;
+        if (typeof initStatsMap === 'function') initStatsMap();
+      }
+      /* sichtbar gewordene Karte an die Fläche anpassen */
+      window.dispatchEvent(new Event('resize'));
+      if (window.innerWidth < 768) {
+        document.getElementById('hubSidebar').classList.remove('mobile-open');
+        document.getElementById('sidebarOverlay').classList.remove('active');
+      }
+    });
+  });
+  document.getElementById('hubCollapseBtn').addEventListener('click', function () {
+    document.getElementById('hubSidebar').classList.toggle('collapsed');
+    setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 380);
+  });
+  document.getElementById('hubMobileMenuBtn').addEventListener('click', function () {
+    document.getElementById('hubSidebar').classList.toggle('mobile-open');
+    document.getElementById('sidebarOverlay').classList.toggle('active');
+  });
 
   /* Card clicks on landing page */
   document.querySelectorAll('.nav-card[data-nav]').forEach(card => {
@@ -1465,7 +1676,7 @@ h1:hover {
      deren Guthaben mitten im Monat ausläuft.
   ══════════════════════════════════════════ */
   const MO_CFG = {
-    START:      '2026-09-12',  // Serverstart – bestimmt auch den Stichtag jedes Monats
+    START:      '2026-09-14',  // Serverstart – bestimmt auch den Stichtag jedes Monats
     CREDIT_EUR: 0.60,          // 1 Credit = 0,60 €  (entspricht der Sheet-Formel =ABRUNDEN(F/0,6;0))
     COST_EUR:   360,           // Serverkosten je Spielmonat
     MAX_MONTHS: 30,            // Obergrenze der Vorausrechnung
@@ -1564,7 +1775,7 @@ h1:hover {
       const income = credits * MO_CFG.CREDIT_EUR;
       const saldo  = income - MO_CFG.COST_EUR;
       cum += saldo;
-      months.push({ n: n, mStart: mStart, mEnd: mEnd - MS_DAY, days: days, players: players,
+      months.push({ n: n, mStart: mStart, mEnd: mEnd, days: days, players: players,
                     credits: credits, income: income, saldo: saldo, cum: cum });
     }
     spans.sort(function (a, b) { return a.name.localeCompare(b.name, 'de'); });
@@ -1870,6 +2081,7 @@ h1:hover {
   });
   overlay.addEventListener('click', () => {
     crSidebar.classList.remove('mobile-open');
+    document.getElementById('hubSidebar').classList.remove('mobile-open');
     overlay.classList.remove('active');
   });
 
@@ -2490,12 +2702,18 @@ window.initStatsMap = function () {
       badge.className = 'stats-badge' + (live ? ' live' : '');
     }
 
-    function loadLiveData() {
+    function loadLiveData(attempt) {
+      attempt = attempt || 1;
       if (!ST_CONFIG.SHEET_URL) { setBadge('Keine Sheet-URL', false); redrawDots(); return; }
-      setBadge('Lädt …', false);
+      setBadge(attempt > 1 ? 'Lädt (2. Versuch) …' : 'Lädt …', false);
       const cb = '__stCB_' + Date.now();
-      /* Apps Script braucht beim Kaltstart oft deutlich mehr als 9 s. */
-      const timer = setTimeout(function(){ delete window[cb]; setBadge('Zeitüberschreitung', false); }, 25000);
+      /* Apps Script braucht beim Kaltstart oft deutlich mehr als 9 s.
+         Diese Karte hat keinen Aktualisieren-Knopf – daher einmal selbst neu versuchen. */
+      const timer = setTimeout(function(){
+        delete window[cb];
+        const el = document.getElementById('jsonpSt'); if (el) el.parentNode.removeChild(el);
+        if (attempt < 2) loadLiveData(attempt + 1); else setBadge('Zeitüberschreitung', false);
+      }, 25000);
       window[cb] = function(raw) {
         clearTimeout(timer); delete window[cb];
         const el=document.getElementById('jsonpSt');
@@ -2815,6 +3033,321 @@ window.initHubMap = function () {
       setBadge(err.message, false);
     });
   });
+};
+</script>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     STATISTIKEN – DASHBOARD
+═══════════════════════════════════════════════════════ -->
+<script>
+/* Land (ISO) → Region, abgeleitet aus ISO 3166 / UN M49 */
+const DB_A2REGION = {"AF":"AS","AX":"EU","AL":"EU","DZ":"AF","AS":"OC","AD":"EU","AO":"AF","AI":"LA","AG":"LA","AR":"LA","AM":"AS","AW":"LA","AU":"OC","AT":"EU","AZ":"AS","BS":"LA","BH":"AS","BD":"AS","BB":"LA","BY":"EU","BE":"EU","BZ":"LA","BJ":"AF","BM":"NA","BT":"AS","BO":"LA","BQ":"LA","BA":"EU","BW":"AF","BV":"LA","BR":"LA","IO":"AF","BN":"AS","BG":"EU","BF":"AF","BI":"AF","CV":"AF","KH":"AS","CM":"AF","CA":"NA","KY":"LA","CF":"AF","TD":"AF","CL":"LA","CN":"AS","CX":"OC","CC":"OC","CO":"LA","KM":"AF","CG":"AF","CD":"AF","CK":"OC","CR":"LA","CI":"AF","HR":"EU","CU":"LA","CW":"LA","CY":"AS","CZ":"EU","DK":"EU","DJ":"AF","DM":"LA","DO":"LA","EC":"LA","EG":"AF","SV":"LA","GQ":"AF","ER":"AF","EE":"EU","SZ":"AF","ET":"AF","FK":"LA","FO":"EU","FJ":"OC","FI":"EU","FR":"EU","GF":"LA","PF":"OC","TF":"AF","GA":"AF","GM":"AF","GE":"AS","DE":"EU","GH":"AF","GI":"EU","GR":"EU","GL":"NA","GD":"LA","GP":"LA","GU":"OC","GT":"LA","GG":"EU","GN":"AF","GW":"AF","GY":"LA","HT":"LA","HM":"OC","VA":"EU","HN":"LA","HK":"AS","HU":"EU","IS":"EU","IN":"AS","ID":"AS","IR":"AS","IQ":"AS","IE":"EU","IM":"EU","IL":"AS","IT":"EU","JM":"LA","JP":"AS","JE":"EU","JO":"AS","KZ":"AS","KE":"AF","KI":"OC","KP":"AS","KR":"AS","KW":"AS","KG":"AS","LA":"AS","LV":"EU","LB":"AS","LS":"AF","LR":"AF","LY":"AF","LI":"EU","LT":"EU","LU":"EU","MO":"AS","MG":"AF","MW":"AF","MY":"AS","MV":"AS","ML":"AF","MT":"EU","MH":"OC","MQ":"LA","MR":"AF","MU":"AF","YT":"AF","MX":"LA","FM":"OC","MD":"EU","MC":"EU","MN":"AS","ME":"EU","MS":"LA","MA":"AF","MZ":"AF","MM":"AS","NA":"AF","NR":"OC","NP":"AS","NL":"EU","NC":"OC","NZ":"OC","NI":"LA","NE":"AF","NG":"AF","NU":"OC","NF":"OC","MK":"EU","MP":"OC","NO":"EU","OM":"AS","PK":"AS","PW":"OC","PS":"AS","PA":"LA","PG":"OC","PY":"LA","PE":"LA","PH":"AS","PN":"OC","PL":"EU","PT":"EU","PR":"LA","QA":"AS","RE":"AF","RO":"EU","RU":"EU","RW":"AF","BL":"LA","SH":"AF","KN":"LA","LC":"LA","MF":"LA","PM":"NA","VC":"LA","WS":"OC","SM":"EU","ST":"AF","SA":"AS","SN":"AF","RS":"EU","SC":"AF","SL":"AF","SG":"AS","SX":"LA","SK":"EU","SI":"EU","SB":"OC","SO":"AF","ZA":"AF","GS":"LA","SS":"AF","ES":"EU","LK":"AS","SD":"AF","SR":"LA","SJ":"EU","SE":"EU","CH":"EU","SY":"AS","TJ":"AS","TZ":"AF","TH":"AS","TL":"AS","TG":"AF","TK":"OC","TO":"OC","TT":"LA","TN":"AF","TR":"AS","TM":"AS","TC":"LA","TV":"OC","UG":"AF","UA":"EU","AE":"AS","GB":"EU","US":"NA","UM":"OC","UY":"LA","UZ":"AS","VU":"OC","VE":"LA","VN":"AS","VG":"LA","VI":"LA","WF":"OC","EH":"AF","YE":"AS","ZM":"AF","ZW":"AF","XK":"EU"};
+const DB_REGION_NAMES = { EU: 'Europa', AS: 'Asien', NA: 'Nordamerika', LA: 'Lateinamerika', AF: 'Afrika', OC: 'Ozeanien' };
+
+window.initStatsDashboard = function () {
+  const $ = function (id) { return document.getElementById(id); };
+  const SERIES = ['var(--db-s2)', 'var(--db-s3)', 'var(--db-s1)'];   // Allianzen in fester Reihenfolge
+  const METRICS = [
+    { key: 'passagiere', label: 'Passagiere',      by: 'Passagieren',     unit: '' },
+    { key: 'fracht',     label: 'Fracht',          by: 'Fracht',          unit: ' FE' },
+    { key: 'flotte',     label: 'Flotte',          by: 'Flottengröße',    unit: ' Flz.' },
+    { key: 'stations',   label: 'Stationen',       by: 'Stationen',       unit: '' },
+    { key: 'effizienz',  label: 'PAX je Flugzeug', by: 'PAX je Flugzeug', unit: '' },
+  ];
+  let data = [], metric = METRICS[0], showAll = false, sortKey = 'passagiere', sortDir = -1, region = {};
+
+  const nf  = new Intl.NumberFormat('de-DE');
+  const fmt = function (v) { return nf.format(Math.round(v)); };
+  function compact(v) {
+    if (v >= 1e6) return (v / 1e6).toLocaleString('de-DE', { maximumFractionDigits: 2 }) + ' Mio.';
+    if (v >= 1e4) return (v / 1e3).toLocaleString('de-DE', { maximumFractionDigits: 0 }) + ' Tsd.';
+    return fmt(v);
+  }
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function val(r, key) {
+    if (key === 'effizienz') return r.flotte > 0 ? r.passagiere / r.flotte : 0;
+    return Number(r[key]) || 0;
+  }
+  function badge(text, live) {
+    $('dbBadge').textContent = text;
+    $('dbBadge').className = 'cr-source-badge' + (live ? ' live' : '');
+  }
+
+  /* ── Tooltip: jedes Element mit data-tip ── */
+  const tip = $('dbTip'), root = $('statsDash');
+  root.addEventListener('mousemove', function (e) {
+    const t = e.target.closest('[data-tip]');
+    if (!t) { tip.classList.remove('on'); return; }
+    tip.textContent = t.getAttribute('data-tip');
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = e.clientX + 14, y = e.clientY + 14;
+    if (x + w > window.innerWidth - 8)  x = e.clientX - w - 14;
+    if (y + h > window.innerHeight - 8) y = e.clientY - h - 14;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+    tip.classList.add('on');
+  });
+  root.addEventListener('mouseleave', function () { tip.classList.remove('on'); });
+
+  /* ── Kennzahl-Umschalter ── */
+  $('dbMetric').innerHTML = METRICS.map(function (m, i) {
+    return '<button role="tab" data-m="' + m.key + '"' + (i === 0 ? ' class="active" aria-selected="true"' : ' aria-selected="false"') + '>' + m.label + '</button>';
+  }).join('');
+  $('dbMetric').addEventListener('click', function (e) {
+    const b = e.target.closest('button'); if (!b) return;
+    metric = METRICS.find(function (m) { return m.key === b.dataset.m; });
+    $('dbMetric').querySelectorAll('button').forEach(function (x) {
+      x.classList.toggle('active', x === b); x.setAttribute('aria-selected', x === b ? 'true' : 'false');
+    });
+    sortKey = metric.key; sortDir = -1;
+    render();
+  });
+  $('dbAirMore').addEventListener('click', function () { showAll = !showAll; renderAirlines(); });
+  $('dbRefreshBtn').addEventListener('click', load);
+
+  /* ── Bausteine ── */
+  function barRow(lbl, sub, segs, max, valueText, rank) {
+    const total = segs.reduce(function (a, s) { return a + s.v; }, 0);
+    const pct = max > 0 ? Math.max(0.4, total / max * 100) : 0;
+    return '<div class="db-row">' +
+      '<div class="db-row-lbl">' +
+        '<div class="db-row-name">' + (rank ? '<span class="db-rank">' + rank + '</span>' : '') + lbl + '</div>' +
+        (sub ? '<div class="db-row-sub">' + (rank ? '<span class="db-rank"></span>' : '') + sub + '</div>' : '') +
+      '</div>' +
+      '<div class="db-track">' +
+        '<div class="db-bar' + (segs.length === 1 ? ' single' : '') + '" style="width:' + pct.toFixed(2) + '%">' +
+        segs.map(function (s) {
+          return '<i class="db-seg-fill" style="flex:' + Math.max(s.v, 0.0001) + ' 1 0' + (s.c ? ';background:' + s.c : '') + '" data-tip="' + esc(s.tip) + '"></i>';
+        }).join('') +
+        '</div>' +
+        '<span class="db-val">' + valueText + '</span>' +
+      '</div></div>';
+  }
+
+  function renderKpis() {
+    const sum = function (k) { return data.reduce(function (a, r) { return a + (Number(r[k]) || 0); }, 0); };
+    const ceos = new Set(data.map(function (r) { return r.ceo; }).filter(Boolean)).size;
+    const tiles = [
+      ['Airlines',    data.length,              'ab 3 Stationen'],
+      ['Spieler',     ceos,                     'CEOs mit Airline'],
+      ['Passagiere',  compact(sum('passagiere')), 'transportiert gesamt'],
+      ['Fracht',      compact(sum('fracht')),   'FE gesamt'],
+      ['Flugzeuge',   fmt(sum('flotte')),       'alle Flotten'],
+      ['Stationen',   fmt(sum('stations')),     'alle Airlines'],
+    ];
+    $('dbKpis').innerHTML = tiles.map(function (t, i) {
+      return '<div class="db-kpi" style="animation-delay:' + (i * 0.04).toFixed(2) + 's"><div class="db-kpi-lbl">' + t[0] + '</div>' +
+             '<div class="db-kpi-val">' + t[1] + '</div><div class="db-kpi-sub">' + t[2] + '</div></div>';
+    }).join('');
+  }
+
+  function renderAirlines() {
+    const list = data.filter(function (r) { return metric.key !== 'effizienz' || r.flotte > 0; })
+      .slice().sort(function (a, b) { return val(b, metric.key) - val(a, metric.key); });
+    const shown = showAll ? list : list.slice(0, 10);
+    const max = shown.length ? val(shown[0], metric.key) : 0;
+    $('dbAirTitle').textContent = (showAll ? 'Alle Airlines' : 'Top 10 Airlines') + ' nach ' + metric.by;
+    $('dbAirSub').innerHTML = '<span class="db-ally" style="margin:0 6px 0 0"></span>Allianzmitglied';
+    $('dbAirMore').textContent = showAll ? 'Nur Top 10' : 'Alle ' + list.length + ' anzeigen';
+    $('dbAir').innerHTML = shown.map(function (r, i) {
+      const v = val(r, metric.key);
+      return barRow(esc(r.name) + (r.allianz ? '<span class="db-ally" data-tip="' + esc(r.allianz) + '"></span>' : ''),
+        esc(r.ceo || '—') + ' · ' + esc(r.hqCode),
+        [{ v: v, tip: r.name + '\n' + metric.label + ': ' + fmt(v) + metric.unit + '\nCEO ' + (r.ceo || '—') + ' · ' + r.hqCode }],
+        max, fmt(v) + metric.unit, i + 1);
+    }).join('') || '<div class="db-empty">Keine Daten</div>';
+  }
+
+  /* Spieler: ein Balken je CEO, Segmente = seine Airlines (2px Lücke) */
+  function renderCeos() {
+    const by = {};
+    data.forEach(function (r) {
+      const k = r.ceo || '—';
+      (by[k] = by[k] || []).push(r);
+    });
+    const rows = Object.keys(by).map(function (k) {
+      const airl = by[k].slice().sort(function (a, b) { return val(b, metric.key) - val(a, metric.key); });
+      let total;
+      if (metric.key === 'effizienz') {
+        const pax = airl.reduce(function (a, r) { return a + r.passagiere; }, 0);
+        const fl  = airl.reduce(function (a, r) { return a + r.flotte; }, 0);
+        total = fl > 0 ? pax / fl : 0;
+      } else total = airl.reduce(function (a, r) { return a + val(r, metric.key); }, 0);
+      return { ceo: k, airl: airl, total: total };
+    }).sort(function (a, b) { return b.total - a.total; }).slice(0, 10);
+    const max = rows.length ? rows[0].total : 0;
+    $('dbCeoSub').textContent = 'Top 10 nach ' + metric.by + (metric.key === 'effizienz' ? ' (über alle eigenen Airlines)' : ' · Segmente = einzelne Airlines');
+    $('dbCeo').innerHTML = rows.map(function (r, i) {
+      const segs = metric.key === 'effizienz'
+        ? [{ v: r.total, tip: r.ceo + '\n' + fmt(r.total) + ' PAX je Flugzeug' }]
+        : r.airl.map(function (a) { return { v: val(a, metric.key), tip: a.name + '\n' + metric.label + ': ' + fmt(val(a, metric.key)) + metric.unit }; });
+      return barRow(esc(r.ceo), r.airl.length + (r.airl.length === 1 ? ' Airline' : ' Airlines'), segs, max, fmt(r.total) + metric.unit, i + 1);
+    }).join('') || '<div class="db-empty">Keine Daten</div>';
+  }
+
+  function renderRegions() {
+    if (!window.AIRPORTS) { $('dbReg').innerHTML = '<div class="db-empty">Flughafendaten werden geladen …</div>'; return; }
+    const by = {};
+    data.forEach(function (r) {
+      const a = region[r.hqCode]; const g = (a && DB_A2REGION[a]) || '?';
+      (by[g] = by[g] || []).push(r);
+    });
+    const rows = Object.keys(by).map(function (g) {
+      const airl = by[g];
+      let total;
+      if (metric.key === 'effizienz') {
+        const pax = airl.reduce(function (a, r) { return a + r.passagiere; }, 0), fl = airl.reduce(function (a, r) { return a + r.flotte; }, 0);
+        total = fl > 0 ? pax / fl : 0;
+      } else total = airl.reduce(function (a, r) { return a + val(r, metric.key); }, 0);
+      return { g: g, n: airl.length, total: total };
+    }).sort(function (a, b) { return b.total - a.total; });
+    const max = rows.length ? rows[0].total : 0;
+    $('dbReg').innerHTML = rows.map(function (r) {
+      const name = DB_REGION_NAMES[r.g] || 'ohne Zuordnung';   /* Hub fehlt in den Flughafendaten */
+      return barRow(name, r.n + (r.n === 1 ? ' Airline' : ' Airlines'),
+        [{ v: r.total, tip: name + '\n' + metric.label + ': ' + fmt(r.total) + metric.unit + '\n' + r.n + ' Airlines' }],
+        max, (metric.key === 'effizienz' ? fmt(r.total) : compact(r.total)) + metric.unit);
+    }).join('');
+  }
+
+  /* Allianzen: Anteil an Airlines und an der gewählten Kennzahl */
+  function renderAlliances() {
+    const names = {};
+    data.forEach(function (r) { if (r.allianz) names[r.allianz] = (names[r.allianz] || 0) + 1; });
+    let list = Object.keys(names).sort(function (a, b) { return names[b] - names[a]; });
+    const groups = list.slice(0, 3).map(function (n, i) { return { name: n, color: SERIES[i], test: function (r) { return r.allianz === n; } }; });
+    if (list.length > 3) groups.push({ name: 'weitere Allianzen', color: 'var(--db-s1)', test: function (r) { return r.allianz && list.indexOf(r.allianz) >= 3; } });
+    groups.push({ name: 'ohne Allianz', color: 'var(--db-muted-mark)', test: function (r) { return !r.allianz; } });
+
+    const mKey = metric.key === 'effizienz' ? 'passagiere' : metric.key;
+    const mLbl = metric.key === 'effizienz' ? 'Passagiere' : metric.label;
+    function shareBar(title, getter) {
+      const tot = groups.reduce(function (a, g) { return a + data.filter(g.test).reduce(function (x, r) { return x + getter(r); }, 0); }, 0);
+      return '<div class="db-share"><div class="db-share-head"><span>' + title + '</span><span>' + fmt(tot) + '</span></div><div class="db-share-bar">' +
+        groups.map(function (g) {
+          const v = data.filter(g.test).reduce(function (x, r) { return x + getter(r); }, 0);
+          const pc = tot ? v / tot * 100 : 0;
+          return pc > 0 ? '<i style="flex:' + v + ' 1 0;background:' + g.color + '" data-tip="' + esc(g.name + '\n' + fmt(v) + ' (' + pc.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' %)') + '"></i>' : '';
+        }).join('') + '</div></div>';
+    }
+    const ally = data.filter(function (r) { return r.allianz; });
+    const share = function (k) { const t = data.reduce(function (a, r) { return a + val(r, k); }, 0); return t ? ally.reduce(function (a, r) { return a + val(r, k); }, 0) / t * 100 : 0; };
+    $('dbAllSub').textContent = list.length ? list.length + (list.length === 1 ? ' Allianz' : ' Allianzen') + ' im Spiel' : 'Noch keine Allianz im Spiel';
+    $('dbAll').innerHTML =
+      '<div class="db-legend">' + groups.map(function (g) { return '<span><i style="background:' + g.color + '"></i>' + esc(g.name) + '</span>'; }).join('') + '</div>' +
+      shareBar('Anteil an Airlines', function () { return 1; }) +
+      shareBar('Anteil an ' + mLbl, function (r) { return val(r, mKey); }) +
+      (ally.length
+        ? '<div class="db-note"><b>' + ally.length + ' von ' + data.length + '</b> Airlines sind in einer Allianz, transportieren aber <b>' +
+          share(mKey).toLocaleString('de-DE', { maximumFractionDigits: 0 }) + ' %</b> der ' + esc(mLbl) + '.</div>'
+        : '');
+  }
+
+  function renderRatings() {
+    const order = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'CCC', 'CC', 'C', 'D'];
+    const cnt = {};
+    data.forEach(function (r) { const k = (r.finanzrating || '—').toUpperCase(); cnt[k] = (cnt[k] || 0) + 1; });
+    const keys = order.filter(function (k) { return cnt[k]; }).concat(Object.keys(cnt).filter(function (k) { return order.indexOf(k) < 0; }));
+    const max = Math.max.apply(null, keys.map(function (k) { return cnt[k]; }).concat([0]));
+    $('dbRating').innerHTML = keys.map(function (k) {
+      const who = data.filter(function (r) { return (r.finanzrating || '—').toUpperCase() === k; }).map(function (r) { return r.name; });
+      return barRow(esc(k), '', [{ v: cnt[k], tip: k + ': ' + cnt[k] + ' Airlines' + (who.length <= 6 ? '\n' + who.join('\n') : '') }], max,
+        cnt[k] + (cnt[k] === 1 ? ' Airline' : ' Airlines'));
+    }).join('');
+  }
+
+  function renderTable() {
+    const cols = [
+      ['name', 'Airline', false], ['ceo', 'CEO', false], ['allianz', 'Allianz', false], ['hqCode', 'Hub', false],
+      ['passagiere', 'Passagiere', true], ['fracht', 'Fracht (FE)', true], ['flotte', 'Flotte', true],
+      ['stations', 'Stationen', true], ['effizienz', 'PAX/Flz.', true], ['finanzrating', 'Rating', false],
+    ];
+    const rows = data.slice().sort(function (a, b) {
+      const num = cols.find(function (c) { return c[0] === sortKey; })[2];
+      const x = num ? val(a, sortKey) : String(a[sortKey] || '').toLowerCase();
+      const y = num ? val(b, sortKey) : String(b[sortKey] || '').toLowerCase();
+      return (x < y ? -1 : x > y ? 1 : 0) * sortDir;
+    });
+    $('dbTable').innerHTML =
+      '<thead><tr><th class="num">#</th>' + cols.map(function (c) {
+        return '<th data-k="' + c[0] + '" class="' + (c[2] ? 'num' : '') + (c[0] === sortKey ? ' sorted' : '') + '">' + c[1] +
+          (c[0] === sortKey ? (sortDir < 0 ? ' ↓' : ' ↑') : '') + '</th>';
+      }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (r, i) {
+        return '<tr><td class="num" style="opacity:.45">' + (i + 1) + '</td>' + cols.map(function (c) {
+          const v = c[2] ? fmt(val(r, c[0])) : esc(r[c[0]] || '—');
+          return '<td class="' + (c[2] ? 'num' : '') + '">' + v + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody>';
+    $('dbTable').querySelectorAll('th[data-k]').forEach(function (th) {
+      th.addEventListener('click', function () {
+        const k = th.dataset.k;
+        if (k === sortKey) sortDir = -sortDir; else { sortKey = k; sortDir = cols.find(function (c) { return c[0] === k; })[2] ? -1 : 1; }
+        renderTable();
+      });
+    });
+  }
+
+  function render() {
+    renderKpis(); renderAirlines(); renderCeos(); renderRegions(); renderAlliances(); renderRatings(); renderTable();
+  }
+
+  function showEmpty(msg) {
+    ['dbAir', 'dbCeo', 'dbReg', 'dbAll', 'dbRating'].forEach(function (id) { $(id).innerHTML = '<div class="db-empty">' + esc(msg) + '</div>'; });
+    $('dbTable').innerHTML = '';
+    $('dbKpis').innerHTML = '';
+  }
+
+  /* ── Daten ── */
+  let loading = false;
+  function load() {
+    if (loading) return;
+    const url = (typeof ST_CONFIG !== 'undefined') ? ST_CONFIG.SHEET_URL : '';
+    if (!url) { badge('Keine Sheet-URL', false); showEmpty('Keine Sheet-URL hinterlegt.'); return; }
+    loading = true;
+    $('dbRefreshBtn').classList.add('spinning');
+    badge('Lädt …', false);
+    if (!data.length) showEmpty('Lade Daten aus dem Sheet …');
+    const cb = '__dbCB_' + Date.now();
+    const s  = document.createElement('script');
+    function done() { loading = false; $('dbRefreshBtn').classList.remove('spinning'); clearTimeout(timer); delete window[cb]; s.remove(); }
+    const timer = setTimeout(function () { done(); badge('Zeitüberschreitung', false); if (!data.length) showEmpty('Zeitüberschreitung – Sheet nicht erreichbar.'); }, 25000);
+    window[cb] = function (raw) {
+      done();
+      if (!Array.isArray(raw)) { badge('Sheet-Fehler', false); if (!data.length) showEmpty('Sheet-Fehler: ' + ((raw && raw.error) || 'unerwartete Antwort')); return; }
+      data = raw.filter(function (r) { return r && r.name && (Number(r.stations) || 0) >= 3; }).map(function (r) {
+        return Object.assign({}, r, { passagiere: Number(r.passagiere) || 0, fracht: Number(r.fracht) || 0,
+                                      flotte: Number(r.flotte) || 0, stations: Number(r.stations) || 0 });
+      });
+      badge(data.length ? 'Live' : 'Keine Daten', data.length > 0);
+      if (!data.length) { showEmpty('Keine Airlines im Sheet.'); return; }
+      $('dbFoot').textContent = 'Quelle: Unternehmen-Sheet (Scraper) · ' + data.length + ' Airlines ab 3 Stationen · Stand ' +
+        new Date().toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) + '.';
+      render();
+    };
+    s.onerror = function () { done(); badge('Keine Verbindung', false); if (!data.length) showEmpty('Sheet nicht erreichbar – Verbindung prüfen.'); };
+    s.src = url + '?action=unternehmen&callback=' + cb;
+    document.head.appendChild(s);
+  }
+
+  /* Flughafendaten für die Regionen nachladen (dieselbe Datei wie die Karten) */
+  function withAirports() {
+    region = {};
+    (window.AIRPORTS || []).forEach(function (a) { if (a && a[0]) region[a[0]] = a[3]; });
+    if (data.length) renderRegions();
+  }
+  if (window.AIRPORTS && window.AIRPORTS.length) withAirports();
+  else {
+    const s = document.createElement('script');
+    s.src = 'airports.js'; s.async = true; s.onload = withAirports;
+    document.head.appendChild(s);
+  }
+
+  load();
 };
 </script>
 
